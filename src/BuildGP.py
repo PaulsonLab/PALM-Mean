@@ -74,7 +74,7 @@ class GPBuild():
         self.y = torch.tensor(np.load(Y_path))
         self.dim = self.x.shape[1]
         
-        self.l = torch.tensor([[data['.kernel.lengthscales']]*self.dim]).to(torch.float64)
+        self.l = torch.tensor([data['.kernel.lengthscales']]).to(torch.float64)
         self.sigma_f = torch.tensor(data['.kernel.variance']).to(torch.float64)**0.5
         self.jitter = torch.tensor([data['.likelihood.variance']]).to(torch.float64)
         self.alpha = self.MeanComp()

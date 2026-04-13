@@ -20,7 +20,7 @@ def Build_GP(Preprocess, Thread_gurobi,PWL_segment, n_prepart, hyperparameter, a
 
     candidate, pre_UB = get_UB(GP_obj.sigma_f,  GP_obj.alpha, GP_obj.x/GP_obj.l, torch.zeros(dim), torch.ones(dim)/GP_obj.l[0], 5)     
     
-    GP_obj.Best_UB = pre_UB # presolving solution
+    GP_obj.Best_UB = float(pre_UB) # presolving solution
     GP_obj.Best_UB_arg = candidate*l[0] # presolving argument
     
     xL = torch.zeros(dim)
