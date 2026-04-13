@@ -10,6 +10,7 @@ pip install -r requirements.txt
 ## Running Experiments
 
 Experiments can be run using the `main.py` script. You must specify the path for GP trainin data and hyperparameter settings.
+Gurobi license is required to solve the lower bounding problem (MIQCP).
 
 **Basic Command**
 ```
