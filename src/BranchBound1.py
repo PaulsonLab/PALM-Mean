@@ -97,7 +97,7 @@ class Node():
         if RootNode is False:
             self.x_arg, self.LB, self.UB = self.LB()
            
-    def LB(self): # TO DO: Add a lower Bounding function
+    def LB(self): 
         with torch.no_grad():         
             x_arg, LB, UB = get_LB(self.bounds, self.BO_obj, Thread=self.BO_obj.Thread_gurobi)        
         
@@ -225,7 +225,7 @@ def BranchBound(time_limit, BO_obj):
        
 
         if BO_obj.Best_UB>np.min(UpperBoundList):
-            BO_obj.Best_UB = torch.tensor(np.min(UpperBoundList))
+            BO_obj.Best_UB = float(torch.tensor(np.min(UpperBoundList)))
             BO_obj.Best_UB_arg = DecisionNodes[np.argmin(UpperBoundList)].x_arg 
            
             
