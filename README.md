@@ -9,7 +9,7 @@ pip install -r requirements.txt
 
 ## Running Experiments
 
-Experiments can be run using the `main.py` script. You must specify the path for GP trainin data and hyperparameter settings.
+Experiments can be run using the `main.py` script. You must specify the path for the.json file containing GP training data and hyperparameter settings.
 Gurobi license is required to solve the lower bounding problem (MIQCP).
 
 We currently only support squared exponential kernel function. Support of Matern class kernel function will be released in future.
