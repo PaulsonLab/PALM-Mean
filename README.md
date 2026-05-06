@@ -9,8 +9,9 @@ pip install -r requirements.txt
 
 ## Running Experiments
 
-*    Experiments can be run using the `main.py` script. Users need to specify the path for the .npy and .json files containing Gaussian processes (GPs) training data and hyperparameter settings.
-Gurobi license is required to solve the lower bounding problem (MIQCP).
+*    Experiments can be run using the `main.py` script. Users need to specify the path for the .npy and .json files containing Gaussian processes (GPs) training data and hyperparameter settings. Defulat files are under [data](https://github.com/PaulsonLab/PALM-Mean/tree/b6249bed15004412431ec49c142e3676d2d75e90/data).
+
+*    Gurobi license is required to solve the lower bounding problem (MIQCP).
 
 *    Hyperparameter setting for PALM-Mean can be specified in [main.py](https://github.com/PaulsonLab/PALM-Mean/blob/b07e0ff4c91f2701f775884f85484fdcfc14f6e0/main.py).
 
