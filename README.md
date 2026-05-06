@@ -9,12 +9,12 @@ pip install -r requirements.txt
 
 ## Running Experiments
 
-Experiments can be run using the `main.py` script. Users need to specify the path for the .npy and .json files containing GP training data and hyperparameter settings.
+*    Experiments can be run using the `main.py` script. Users need to specify the path for the .npy and .json files containing GP training data and hyperparameter settings.
 Gurobi license is required to solve the lower bounding problem (MIQCP).
 
-Hyperparameter setting for PALM-Mean can be specified in main.py.
+*    Hyperparameter setting for PALM-Mean can be specified in main.py.
 
-We currently only support squared exponential kernel function. Support of Matern class kernel function will be released in future.
+*    We currently only support squared exponential kernel function. Support of Matern class kernel function will be released in future.
 
 **Basic Command**
 ```
