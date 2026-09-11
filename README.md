@@ -2,6 +2,8 @@
 
 This repository contains the code to reproduce the PALM-Mean algorithm proposed in the paper _An Efficient Spatial Branch-and-Bound Algorithm for Global Optimization of Gaussian Process Posterior Mean Functions_.
 
+![Demo](figure/palm_mean_1d (3).gif)
+
 # Installation
 ```sh
 pip install -r requirements.txt
