@@ -7,23 +7,29 @@ summary built from the statistics BranchBound stores in BO_obj.result.
 import torch
 
 
-def print_progress_header():
-    """Column titles for the progress lines printed during the search."""
-    print("%8s %7s %12s %12s %10s %9s %9s" % ("Nodes", "Open", "Best UB", "Lower bound", "Abs gap", "Rel gap", "Time (s)"))
-
-
-def print_progress(nodes, open_nodes, UB, LB, elapsed, note=""):
+class ProgressLog():
     """
-    One progress line. open_nodes and LB are None during preprocessing, when the lower bound
-    of the boxes not yet bounded is unknown.
+    Progress lines printed during the search, under a header of column titles. The header is printed
+    with the first line, so it is not separated from the table by Gurobi's license banner, which
+    appears when the first node MIQCP is built.
     """
-    if LB is None:
-        line = "%8d %7s %12.6f %12s %10s %9s %9.1f   %s" % (nodes, "-", UB, "-", "-", "-", elapsed, note)
-    else:
-        gap = UB - LB
-        rel_gap = "%8.2f%%" % (100*gap/abs(UB)) if UB != 0 else "%9s" % "-"
-        line = "%8d %7d %12.6f %12.6f %10.6f %s %9.1f   %s" % (nodes, open_nodes, UB, LB, gap, rel_gap, elapsed, note)
-    print(line.rstrip())
+
+    def __init__(self):
+        self.header_printed = False
+
+    def line(self, nodes, open_nodes, UB, LB, elapsed, note=""):
+        """One progress line. open_nodes and LB are None during preprocessing, when the lower bound
+        of the boxes not yet bounded is unknown."""
+        if not self.header_printed:
+            print("%8s %7s %12s %12s %10s %9s %9s" % ("Nodes", "Open", "Best UB", "Lower bound", "Abs gap", "Rel gap", "Time (s)"), flush=True)
+            self.header_printed = True
+        if LB is None:
+            line = "%8d %7s %12.6f %12s %10s %9s %9.1f   %s" % (nodes, "-", UB, "-", "-", "-", elapsed, note)
+        else:
+            gap = UB - LB
+            rel_gap = "%8.2f%%" % (100*gap/abs(UB)) if UB != 0 else "%9s" % "-"
+            line = "%8d %7d %12.6f %12.6f %10.6f %s %9.1f   %s" % (nodes, open_nodes, UB, LB, gap, rel_gap, elapsed, note)
+        print(line.rstrip(), flush=True)
 
 
 def print_results(BO_obj):

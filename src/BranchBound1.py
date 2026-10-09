@@ -15,7 +15,7 @@ import numpy as np
 import torch
 from src.LowerBound import get_LB
 from src.Analytical_LB import get_analytic_all
-from src.Report import print_progress_header, print_progress
+from src.Report import ProgressLog
 
 # Outcomes of BranchOrPrune
 PRUNE_BY_BOUND = 1     # node LB above the incumbent
@@ -46,10 +46,10 @@ def partition_bounds(xL, xU, partitions):
     return torch.stack(lower_bounds), torch.stack(upper_bounds)
 
 
-def PrePross(BO_obj, time_limit):
+def PrePross(BO_obj, time_limit, progress):
     """
     Pre-partition the root box into at most 500 sub-boxes with comparable diagonals (if BO_obj.PreProcess)
-    and bound each of them.
+    and bound each of them. progress (a ProgressLog) prints a line every BO_obj.log_every boxes.
 
     Returns the bounded nodes, their upper and lower bounds, an analytical lower bound for the boxes
     that could not be bounded before the time limit (inf if all were bounded), and the number of boxes.
@@ -78,7 +78,7 @@ def PrePross(BO_obj, time_limit):
         UpperBoundList.append(node.UB)
         LowerBoundList.append(node.LB)
         if BO_obj.log_every and len(DecisionNodes) % BO_obj.log_every == 0:
-            print_progress(len(DecisionNodes), None, min(BO_obj.Best_UB, float(min(UpperBoundList))), None,
+            progress.line(len(DecisionNodes), None, min(BO_obj.Best_UB, float(min(UpperBoundList))), None,
                            time.time() - start_time_pre, "preprocessing %d/%d boxes" % (len(DecisionNodes), len(x_LB)))
         if time.time() - start_time_pre > time_limit:
             break
@@ -136,10 +136,9 @@ def BranchBound(time_limit, BO_obj):
     Run statistics are also stored in BO_obj.result (see src/Report.py).
     """
     start_time_BB = time.time()
-    if BO_obj.log_every:
-        print_progress_header()
+    progress = ProgressLog()
 
-    DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB, n_boxes = PrePross(BO_obj, time_limit)
+    DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB, n_boxes = PrePross(BO_obj, time_limit, progress)
     node_count = n_bounded = len(DecisionNodes)
     time_preprocess = time.time() - start_time_BB
     timed_out = False
@@ -180,7 +179,7 @@ def BranchBound(time_limit, BO_obj):
             UpperBoundList[k] = children[0].UB
             UpperBoundList = np.append(UpperBoundList, children[1].UB)
             if node_count >= next_log: # progress line every log_every generated nodes
-                print_progress(node_count, len(DecisionNodes), min(BO_obj.Best_UB, float(np.min(UpperBoundList))),
+                progress.line(node_count, len(DecisionNodes), min(BO_obj.Best_UB, float(np.min(UpperBoundList))),
                                BestLowerBound, time.time() - start_time_BB)
                 next_log += BO_obj.log_every
         else:
