@@ -22,6 +22,7 @@ if __name__=='__main__':
         "abs_gap": 0.1,          # absolute optimality tolerance
         "rel_gap": 0.01,         # relative optimality tolerance (a node is fathomed when either is met)
         "n_multi": 2,            # L-BFGS-B starts per node for the upper bound
+        "log_every": 100,        # print a progress line every 100 generated nodes (0: off)
     }
 
     # Trained GP: hyperparameters, training inputs (scaled to [0,1]^d) and centered outputs

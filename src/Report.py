@@ -1,9 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Human-readable summary of a PALM-Mean run, from the statistics BranchBound stores in BO_obj.result.
+Human-readable output of a PALM-Mean run: progress lines printed during the search, and the final
+summary built from the statistics BranchBound stores in BO_obj.result.
 """
 import torch
+
+
+def print_progress_header():
+    """Column titles for the progress lines printed during the search."""
+    print("%8s %7s %12s %12s %10s %9s %9s" % ("Nodes", "Open", "Best UB", "Lower bound", "Abs gap", "Rel gap", "Time (s)"))
+
+
+def print_progress(nodes, open_nodes, UB, LB, elapsed, note=""):
+    """
+    One progress line. open_nodes and LB are None during preprocessing, when the lower bound
+    of the boxes not yet bounded is unknown.
+    """
+    if LB is None:
+        line = "%8d %7s %12.6f %12s %10s %9s %9.1f   %s" % (nodes, "-", UB, "-", "-", "-", elapsed, note)
+    else:
+        gap = UB - LB
+        rel_gap = "%8.2f%%" % (100*gap/abs(UB)) if UB != 0 else "%9s" % "-"
+        line = "%8d %7d %12.6f %12.6f %10.6f %s %9.1f   %s" % (nodes, open_nodes, UB, LB, gap, rel_gap, elapsed, note)
+    print(line.rstrip())
 
 
 def print_results(BO_obj):

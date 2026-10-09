@@ -143,6 +143,7 @@ All settings are at the top of [`main.py`](main.py):
 | `n_prepart` | `10` | Starting number of partitions along the diagonal for preprocessing. Reduced automatically until there are at most 500 boxes. |
 | `n_multi` | `2` | Number of random L-BFGS-B starts per node for the upper bound. |
 | `Thread_gurobi` | `1` | Threads used by Gurobi for each node MIQCP (and by torch). |
+| `log_every` | `100` | Print a progress line every 100 generated nodes; `0` turns progress output off. |
 
 The paper's experiments use $\rho=0.01$, 6 PWL segments, $\varepsilon_{\rm abs}=0.1$ and $\varepsilon_{\rm rel}=0.01$.
 
@@ -315,7 +316,7 @@ python benchmarks/run_palm.py --problem benzylation --threads 16
 
 BARON is commercial: `run_baron.py` needs the `baron` executable on the PATH and a valid [BARON license](https://minlp.com/baron-licenses). It exits with a message if BARON is not found.
 
-Other options are `--replicates`, `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints the full results summary of every run.
+Other options are `--replicates`, `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints progress every 100 nodes and the full results summary of every run.
 
 How the benchmark scripts work:
 
@@ -338,6 +339,19 @@ One replicate (seed 0) of the 2-D EggHolder benchmark with $N = 1000$, solved wi
 python benchmarks/run_palm.py --problem eggholder --dim 2 --n 1000 --replicates 1 --threads 16 --report
 ```
 
+During the search, a progress line is printed every 100 generated nodes. Branching adds nodes in pairs after 99 preprocessing boxes, so the lines appear at 101, 201, and so on.
+
+```
+   Nodes    Open      Best UB  Lower bound    Abs gap   Rel gap  Time (s)
+     101     100    -4.535390  -135.445192 130.909802  2886.41%      16.5
+     201     150    -4.535390   -10.294490   5.759100   126.98%      26.9
+     301     200    -4.535390    -6.346114   1.810724    39.92%      33.9
+     401     250    -4.535390    -5.238202   0.702811    15.50%      40.5
+     501     300    -4.535390    -4.911225   0.375835     8.29%      46.1
+```
+
+During preprocessing, the lower-bound and gap columns show `-`, since the boxes not yet bounded could still contain lower values. When the search ends, the summary is printed:
+
 ```
 ====================================================================
  PALM-Mean result
@@ -353,7 +367,7 @@ python benchmarks/run_palm.py --problem eggholder --dim 2 --n 1000 --replicates 
  Problem              : d = 2, N = 1000 training points
  Settings             : rho = 0.01, 6 PWL segments, 16 Gurobi thread(s)
  Nodes bounded        : 529 (99 preprocessing boxes + 430 from branching)
- Time                 : 59.0 s (preprocessing 17.0 s, B&B 42.0 s)
+ Time                 : 47.8 s (preprocessing 16.3 s, B&B 31.4 s)
 ====================================================================
 ```
 

@@ -14,7 +14,7 @@ from src.UpperBound import get_UB
 
 
 def setup_problem(Preprocess, Thread_gurobi, PWL_segment, n_prepart, hyperparameter, abs_gap, rel_gap, n_multi,
-                  param_path, X_path, Y_path):
+                  param_path, X_path, Y_path, log_every=100):
     """
     Load the GP and attach everything the B&B needs. The solver works in lengthscale-scaled
     coordinates z = x/l, in which every kernel term depends on a plain Euclidean distance.
@@ -26,6 +26,7 @@ def setup_problem(Preprocess, Thread_gurobi, PWL_segment, n_prepart, hyperparame
         Best_UB_arg : incumbent point (original x-space)
         PreProcess, Thread_gurobi, PWL_segment, n_prepart, hyperparameter (importance threshold rho),
         abs_gap, rel_gap, n_multi : solver settings (see main.py)
+        log_every   : print a progress line every log_every generated nodes (0: no progress output)
     """
     GP_obj = GPModel(param_path=param_path, X_path=X_path, Y_path=Y_path)
     l = GP_obj.l
@@ -48,5 +49,6 @@ def setup_problem(Preprocess, Thread_gurobi, PWL_segment, n_prepart, hyperparame
     GP_obj.abs_gap = abs_gap
     GP_obj.rel_gap = rel_gap
     GP_obj.n_multi = n_multi
+    GP_obj.log_every = log_every
 
     return GP_obj

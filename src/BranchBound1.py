@@ -15,6 +15,7 @@ import numpy as np
 import torch
 from src.LowerBound import get_LB
 from src.Analytical_LB import get_analytic_all
+from src.Report import print_progress_header, print_progress
 
 # Outcomes of BranchOrPrune
 PRUNE_BY_BOUND = 1     # node LB above the incumbent
@@ -76,6 +77,9 @@ def PrePross(BO_obj, time_limit):
         DecisionNodes.append(node)
         UpperBoundList.append(node.UB)
         LowerBoundList.append(node.LB)
+        if BO_obj.log_every and len(DecisionNodes) % BO_obj.log_every == 0:
+            print_progress(len(DecisionNodes), None, min(BO_obj.Best_UB, float(min(UpperBoundList))), None,
+                           time.time() - start_time_pre, "preprocessing %d/%d boxes" % (len(DecisionNodes), len(x_LB)))
         if time.time() - start_time_pre > time_limit:
             break
 
@@ -132,6 +136,8 @@ def BranchBound(time_limit, BO_obj):
     Run statistics are also stored in BO_obj.result (see src/Report.py).
     """
     start_time_BB = time.time()
+    if BO_obj.log_every:
+        print_progress_header()
 
     DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB, n_boxes = PrePross(BO_obj, time_limit)
     node_count = n_bounded = len(DecisionNodes)
@@ -142,6 +148,7 @@ def BranchBound(time_limit, BO_obj):
     LowerBoundList = np.array(LowerBoundList)
     BestLowerBound = min(float(np.min(LowerBoundList)), unexplored_LB)
     condition = BRANCH
+    next_log = (node_count//BO_obj.log_every + 1)*BO_obj.log_every if BO_obj.log_every else float('inf')
 
     while len(DecisionNodes) > 0:
 
@@ -172,6 +179,10 @@ def BranchBound(time_limit, BO_obj):
             LowerBoundList = np.append(LowerBoundList, children[1].LB)
             UpperBoundList[k] = children[0].UB
             UpperBoundList = np.append(UpperBoundList, children[1].UB)
+            if node_count >= next_log: # progress line every log_every generated nodes
+                print_progress(node_count, len(DecisionNodes), min(BO_obj.Best_UB, float(np.min(UpperBoundList))),
+                               BestLowerBound, time.time() - start_time_BB)
+                next_log += BO_obj.log_every
         else:
             if condition == NODE_CONVERGED and float(DecisionNodes[k].UB) <= BO_obj.Best_UB:
                 BO_obj.Best_UB_arg = DecisionNodes[k].x_arg

@@ -27,7 +27,8 @@ if __name__ == '__main__':
         meta = load_meta(path)
 
         torch.manual_seed(seed) # random multistarts of the local upper-bounding solver
-        GP_obj = setup_problem(**PALM_SETTINGS, Thread_gurobi=args.threads, **instance_paths(path))
+        GP_obj = setup_problem(**PALM_SETTINGS, Thread_gurobi=args.threads, **instance_paths(path),
+                               log_every=100 if args.report else 0) # progress lines only with --report
 
         start_time = time.monotonic()
         BestUpperBound, BestLowerBound, node_count, BestUpperBound_arg = BranchBound(args.time_limit, GP_obj)
