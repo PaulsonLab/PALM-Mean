@@ -1,0 +1,5 @@
+botorch
+gpytorch
+pandas
+pyscipopt  # run_scip.py only
+maingopy   # run_maingo.py only
