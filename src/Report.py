@@ -39,11 +39,14 @@ def print_results(BO_obj):
     print(" %-20s : d = %d, N = %d training points" % ("Problem", BO_obj.dim, len(BO_obj.x)))
     print(" %-20s : rho = %g, %d PWL segments, %d Gurobi thread(s)" % (
         "Settings", BO_obj.hyperparameter, BO_obj.PWL_segment, BO_obj.Thread_gurobi))
-    nodes = " %-20s : %d (%d preprocessing boxes + %d from branching)" % (
-        "Nodes bounded", r["nodes"], r["preprocess_boxes"] - r["unexplored_boxes"], r["nodes"] - r["preprocess_boxes"] + r["unexplored_boxes"])
-    print(nodes)
+    n_initial = r["preprocess_boxes"] - r["unexplored_boxes"] # boxes bounded before branching
+    if BO_obj.PreProcess:
+        initial, initial_time = "%d preprocessing boxes" % n_initial, "preprocessing"
+    else:
+        initial, initial_time = "root box", "root box"
+    print(" %-20s : %d (%s + %d from branching)" % ("Nodes bounded", r["nodes"], initial, r["nodes"] - n_initial))
     if not converged:
         print(" %-20s : %d" % ("Open nodes left", r["active_nodes"]))
-    print(" %-20s : %.1f s (preprocessing %.1f s, B&B %.1f s)" % (
-        "Time", r["time_total"], r["time_preprocess"], r["time_total"] - r["time_preprocess"]))
+    print(" %-20s : %.1f s (%s %.1f s, B&B %.1f s)" % (
+        "Time", r["time_total"], initial_time, r["time_preprocess"], r["time_total"] - r["time_preprocess"]))
     print(line)

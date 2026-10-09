@@ -62,7 +62,7 @@ To check that the license works, run `python -c "import gurobipy as gp; gp.Model
 python main.py
 ```
 
-This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints a summary:
+This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints a summary. The output below is from a run with `"Preprocess": False` in `main.py` (branching starts from the root box). With the default `True`, the root box is first split into a grid of up to 500 boxes, and the `Nodes bounded` and `Time` lines show those preprocessing boxes instead.
 
 ```
 ====================================================================
@@ -70,15 +70,15 @@ This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs
 ====================================================================
  Status               : Converged: global minimum certified within tolerance
  Minimum value        : -1.660719   (posterior mean at x*, best upper bound)
- Lower bound          : -1.686670   (certified: mean >= this everywhere in the box)
- Absolute gap         : 0.025951   (tolerance 0.1)
- Relative gap         : 1.56 %     (tolerance 1 %)
- x*                   : [0.445704, 0.456800, 0.676200]
+ Lower bound          : -1.757945   (certified: mean >= this everywhere in the box)
+ Absolute gap         : 0.097226   (tolerance 0.1)
+ Relative gap         : 5.85 %     (tolerance 1 %)
+ x*                   : [0.445703, 0.456800, 0.676201]
 --------------------------------------------------------------------
  Problem              : d = 3, N = 20 training points
  Settings             : rho = 0.01, 6 PWL segments, 1 Gurobi thread(s)
- Nodes bounded        : 343 (343 preprocessing boxes + 0 from branching)
- Time                 : 1.8 s (preprocessing 1.8 s, B&B 0.0 s)
+ Nodes bounded        : 23 (root box + 22 from branching)
+ Time                 : 1.4 s (root box 0.2 s, B&B 1.2 s)
 ====================================================================
 ```
 
