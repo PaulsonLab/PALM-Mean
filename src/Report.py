@@ -31,10 +31,18 @@ def print_results(BO_obj):
     print(line)
     print(" %-20s : %s" % ("Status", status))
     print(" %-20s : %.6f" % ("Minimum value", UB) + "   (posterior mean at x*, best upper bound)")
+    if BO_obj.y_std is not None or BO_obj.y_mean is not None:
+        print(" %-20s : %.6g" % ("Minimum (original)", BO_obj.to_original_y(UB)) + "   (in the units of the original outputs)")
+    else:
+        print(" %-20s : %s" % ("Minimum (original)", "n/a (add y_mean, y_std to params.json)"))
     print(" %-20s : %.6f" % ("Lower bound", LB) + "   (certified: mean >= this everywhere in the box)")
     print(" %-20s : %.6f" % ("Absolute gap", abs_gap) + "   (tolerance %g)" % BO_obj.abs_gap)
     print(" %-20s : %.2f %%" % ("Relative gap", 100*rel_gap) + "     (tolerance %g %%)" % (100*BO_obj.rel_gap))
-    print(" %-20s : [%s]" % ("x*", ", ".join("%.6f" % v for v in x)))
+    if BO_obj.x_lower is not None and BO_obj.x_upper is not None:
+        print(" %-20s : [%s]" % ("x* (original)", ", ".join("%.6g" % v for v in BO_obj.to_original_x(x))))
+    else:
+        print(" %-20s : [%s]" % ("x* (normalized)", ", ".join("%.6f" % v for v in x))
+              + "\n%22s  (add x_lower, x_upper to params.json to report x* in original units)" % "")
     print("-" * 68)
     print(" %-20s : d = %d, N = %d training points" % ("Problem", BO_obj.dim, len(BO_obj.x)))
     print(" %-20s : rho = %g, %d PWL segments, %d Gurobi thread(s)" % (

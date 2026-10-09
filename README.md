@@ -70,10 +70,12 @@ This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs
 ====================================================================
  Status               : Converged: global minimum certified within tolerance
  Minimum value        : -1.660719   (posterior mean at x*, best upper bound)
+ Minimum (original)   : n/a (add y_mean, y_std to params.json)
  Lower bound          : -1.757945   (certified: mean >= this everywhere in the box)
  Absolute gap         : 0.097226   (tolerance 0.1)
  Relative gap         : 5.85 %     (tolerance 1 %)
- x*                   : [0.445703, 0.456800, 0.676201]
+ x* (normalized)      : [0.445703, 0.456800, 0.676201]
+                        (add x_lower, x_upper to params.json to report x* in original units)
 --------------------------------------------------------------------
  Problem              : d = 3, N = 20 training points
  Settings             : rho = 0.01, 6 PWL segments, 1 Gurobi thread(s)
@@ -85,10 +87,11 @@ This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs
 | Line | Meaning |
 |---|---|
 | `Status` | `Converged` when the gap meets either tolerance. Otherwise `Time limit reached`, and an `Open nodes left` line shows how many boxes were still unresolved. If preprocessing was cut short, the boxes it did not reach are bounded analytically and the status says so. |
-| `Minimum value` | $\mu(x^*)$, the best upper bound $\mathrm{UB}^*$. |
+| `Minimum value` | $\mu(x^*)$, the best upper bound $\mathrm{UB}^*$, on the scale of `Y.npy`. |
+| `Minimum (original)` | The same value in the original output units, $y_{\rm mean} + y_{\rm std}\,\mu(x^*)$. It is shown when `params.json` contains `y_mean`/`y_std` (see [Using your own GP](#using-your-own-gp)); the example data does not, hence `n/a`. |
 | `Lower bound` | $\mathrm{LB}^*$: the posterior mean is at least this value everywhere in the box, so the global minimum lies in $[\mathrm{LB}^*, \mathrm{UB}^*]$. The certificate stays valid when the time limit is hit; it is just looser. |
 | `Absolute gap`, `Relative gap` | $\mathrm{UB}^* - \mathrm{LB}^*$, and that difference divided by $\lvert\mathrm{UB}^*\rvert$. |
-| `x*` | Best point found, in the input space of `X.npy`. |
+| `x* (original)` | Best point found, in the original input units, $x_{\rm lower} + x^*(x_{\rm upper} - x_{\rm lower})$. Without `x_lower`/`x_upper` in `params.json` it is printed as `x* (normalized)`, in the $[0,1]^d$ scale of `X.npy`. |
 | `Nodes bounded`, `Time` | Search effort, split into preprocessing and branching. |
 
 The same values are available in code from `GP_obj.result` (a dict) after `BranchBound(time_limit, GP_obj)` returns.
@@ -110,6 +113,18 @@ PALM-Mean takes a **trained** GP. Hyperparameters are not re-fitted. Provide thr
 - `.kernel.variance`: signal variance $\sigma_f^2$
 - `.kernel.lengthscales`: one lengthscale $\ell_j$ per input dimension
 - `.likelihood.variance`: observation-noise variance $\sigma_\varepsilon^2$
+
+Optionally, also give the normalization you applied to the data, so the results are reported in original units. It is used only for reporting, never by the solver:
+
+```json
+{".kernel.variance": 1.0, ".kernel.lengthscales": [0.1, 0.1, 0.1], ".likelihood.variance": 0.0001,
+ "x_lower": [0, 0, 0], "x_upper": [10, 5, 1], "y_mean": 3.2, "y_std": 0.8}
+```
+
+- `x_lower`, `x_upper`: original bounds of each input, where $x_{\rm original} = x_{\rm lower} + x\,(x_{\rm upper} - x_{\rm lower})$
+- `y_mean`, `y_std`: where $y_{\rm original} = y_{\rm mean} + y_{\rm std}\,y$. If you only centered the outputs, set `y_std` to 1.
+
+The benchmark scripts write these keys automatically.
 
 From these values the code builds $\mu(x)=\sum_i \alpha_i\,\sigma_f^2\exp\!\big(-\tfrac12\lVert L^{-1}(x-x_i)\rVert^2\big)$ with $\alpha=(K+\sigma_\varepsilon^2 I)^{-1}y$. If you trained the GP in BoTorch/GPyTorch or scikit-learn, copy the fitted outputscale, lengthscales and noise into these three keys.
 

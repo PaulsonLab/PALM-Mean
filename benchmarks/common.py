@@ -180,6 +180,7 @@ def make_instance(problem, dim, n, seed, root):
     """Generate data, fit the GP and write it in main.py's input format (cached)."""
     path = os.path.join(root, instance_name(problem, dim, n, seed))
     if os.path.exists(os.path.join(path, "meta.json")):
+        add_normalization(path) # instances cached before params.json stored the normalization
         return path
 
     X, Y, bounds, dim, n = generate_data(problem, dim, n, seed)
@@ -196,7 +197,20 @@ def make_instance(problem, dim, n, seed, root):
     with open(os.path.join(path, "meta.json"), "w") as f:
         json.dump({"problem": problem, "dim": dim, "n": n, "seed": seed, "bounds": bounds.tolist(),
                    "y_mean": float(y_mean), "y_std": float(y_std)}, f)
+    add_normalization(path)
     return path
+
+
+def add_normalization(path):
+    """Store the data normalization in params.json, so results can be reported in original units."""
+    meta = load_meta(path)
+    with open(os.path.join(path, "params.json")) as f:
+        params = json.load(f)
+    if "x_lower" in params:
+        return
+    params.update({"x_lower": meta["bounds"][0], "x_upper": meta["bounds"][1], "y_mean": meta["y_mean"], "y_std": meta["y_std"]})
+    with open(os.path.join(path, "params.json"), "w") as f:
+        json.dump(params, f)
 
 
 def instance_paths(path):

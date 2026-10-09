@@ -37,17 +37,20 @@ class GPModel():
     Trained GP with an ARD squared-exponential (RBF) kernel and zero prior mean.
 
     Inputs:
-        param_path : JSON file with '.kernel.variance', '.kernel.lengthscales', '.likelihood.variance'
-        X_path     : training inputs, .npy array (N x dim), scaled to [0,1]^dim
-        Y_path     : training outputs, .npy array (N x 1), centered
+        param_path : JSON file with '.kernel.variance', '.kernel.lengthscales', '.likelihood.variance', and
+                     optionally the normalization of the data ('x_lower', 'x_upper', 'y_mean', 'y_std'):
+                         x_original = x_lower + x*(x_upper - x_lower),   y_original = y_mean + y_std*y
+        X_path     : training inputs, .npy array (N x dim), normalized to [0,1]^dim
+        Y_path     : training outputs, .npy array (N x 1), centered (or standardized)
 
     Attributes:
-        x, y    : training data (x in the original input space)
+        x, y    : normalized training data (x not divided by the lengthscales)
         dim     : input dimension
         l       : lengthscales -- tensor (1 x dim)
         sigma_f : kernel standard deviation
         jitter  : observation-noise variance
         alpha   : (K + noise*I)^-1 y -- tensor (N x 1)
+        x_lower, x_upper, y_mean, y_std : normalization (None if not given in param_path)
     """
 
     def __init__(self, param_path, X_path, Y_path):
@@ -63,11 +66,25 @@ class GPModel():
         self.sigma_f = torch.tensor(params['.kernel.variance']).to(torch.float64)**0.5
         self.jitter = torch.tensor([params['.likelihood.variance']]).to(torch.float64)
 
-        self.K = RBF_Matrix(self.x/self.l, self.sigma_f, self.jitter)
+        self.x_lower, self.x_upper = params.get('x_lower'), params.get('x_upper')
+        self.y_mean, self.y_std = params.get('y_mean'), params.get('y_std')
+
+        self.K =RBF_Matrix(self.x/self.l, self.sigma_f, self.jitter)
         self.K_inv = torch.inverse(self.K)
         self.alpha = torch.matmul(self.K_inv, self.y)
 
+    def to_original_x(self, x):
+        """Map a normalized point x in [0,1]^dim to the original input scale (unchanged if no x_lower/x_upper)."""
+        x = np.asarray(x, dtype=float)
+        if self.x_lower is None or self.x_upper is None:
+            return x
+        return np.asarray(self.x_lower) + x*(np.asarray(self.x_upper) - np.asarray(self.x_lower))
+
+    def to_original_y(self, y):
+        """Map a normalized output value to the original output scale (unchanged if no y_mean/y_std)."""
+        return (self.y_mean or 0.0) + (1.0 if self.y_std is None else self.y_std)*y
+
     def posterior_mean(self, x):
-        """Posterior mean at a single point x (numpy array, original input space)."""
+        """Posterior mean at a single point x (numpy array, normalized input space)."""
         distance = np.linalg.norm(self.x/self.l - x/self.l, axis=1)
         return np.sum(np.array(self.alpha.flatten())*self.sigma_f.numpy()**2*np.exp(-0.5*distance**2))
