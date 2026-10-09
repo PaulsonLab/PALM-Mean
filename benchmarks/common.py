@@ -252,7 +252,7 @@ def interval_bounds(gp):
 
 
 # ---------------------------------------------------------------- driver helpers
-def parse_args(description):
+def parse_args(description, palm=False):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--problem", required=True, choices=list(PROBLEMS))
     parser.add_argument("--dim", type=int, nargs="+", default=[2], help="input dimension(s) (eggholder/schwefel)")
@@ -264,6 +264,8 @@ def parse_args(description):
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--instances", default=os.path.join(BENCH_DIR, "instances"), help="cache directory for GP instances")
     parser.add_argument("--out", default=os.path.join(BENCH_DIR, "results"), help="directory for result CSV files")
+    if palm:
+        parser.add_argument("--report", action="store_true", help="print the full results summary of every run")
     args = parser.parse_args()
     if args.replicates is None:
         args.replicates = {"eggholder": 10, "schwefel": 40, "gp_prior": 100, "autoam": 1, "benzylation": 1}[args.problem]

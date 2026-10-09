@@ -315,7 +315,7 @@ python benchmarks/run_palm.py --problem benzylation --threads 16
 
 BARON is commercial: `run_baron.py` needs the `baron` executable on the PATH and a valid [BARON license](https://minlp.com/baron-licenses). It exits with a message if BARON is not found.
 
-Other options are `--replicates`, `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`.
+Other options are `--replicates`, `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints the full results summary of every run.
 
 How the benchmark scripts work:
 
@@ -329,6 +329,37 @@ How the benchmark scripts work:
   UB and LB are in standardized output units.
 - **Timing.** PALM-Mean reports wall-clock time of the B&B, SCIP reports `getSolvingTime()`, MAiNGO reports `get_cpu_solution_time()`, and BARON reports the solver time returned through Pyomo.
 - **Windows only.** On Windows, SCIP runs in a separate process: pyscipopt and torch each bundle an Intel OpenMP runtime, and they crash if both are loaded in one process.
+
+### Example: EggHolder with 1000 training points
+
+One replicate (seed 0) of the 2-D EggHolder benchmark with $N = 1000$, solved with 16 Gurobi threads:
+
+```sh
+python benchmarks/run_palm.py --problem eggholder --dim 2 --n 1000 --replicates 1 --threads 16 --report
+```
+
+```
+====================================================================
+ PALM-Mean result
+====================================================================
+ Status               : Converged: global minimum certified within tolerance
+ Minimum value        : -4.535390   (posterior mean at x*, best upper bound)
+ Minimum (original)   : -1394.99   (in the units of the original outputs)
+ Lower bound          : -4.629221   (certified: mean >= this everywhere in the box)
+ Absolute gap         : 0.093831   (tolerance 0.1)
+ Relative gap         : 2.07 %     (tolerance 1 %)
+ x* (original)        : [512, 392.523]
+--------------------------------------------------------------------
+ Problem              : d = 2, N = 1000 training points
+ Settings             : rho = 0.01, 6 PWL segments, 16 Gurobi thread(s)
+ Nodes bounded        : 529 (99 preprocessing boxes + 430 from branching)
+ Time                 : 59.0 s (preprocessing 17.0 s, B&B 42.0 s)
+====================================================================
+```
+
+- **Same optimum as the paper.** The minimum value matches the paper's run of this instance to six decimals (−4.535391; 655 nodes, 42.6 s on 16 cores of a Xeon Gold 6444Y).
+- **Timing depends on the machine.** Run times differ with hardware.
+- **Values are for the GP surrogate, not the true function.** x\* lies close to EggHolder's true global minimizer (512, 404.2). The minimum in original units, however, is that of the GP posterior mean: the true EggHolder value is −820 at x\* and −960 at its global minimum. With a finite data set the surrogate overshoots near the boundary, where training points are sparse.
 
 ### Results reported in the paper
 
