@@ -3,9 +3,9 @@
 """
 Created on Wed Jun  7 09:14:51 2023
 
-This is used to fit a gp function on BO torch 
-the class GPBuild is then used to to be a superclass to 
-GPDNN
+GPModel holds a trained GP: it loads the training data and RBF hyperparameters,
+computes alpha = (K + noise*I)^-1 y and evaluates the posterior mean.
+It does not fit hyperparameters (see benchmarks/common.py for fitting).
 
 @author: kudva.7
 """
@@ -48,7 +48,7 @@ def RBF_Matrix(X, lengthscale, fscale, noise):
     return K
    
 
-class GPBuild():
+class GPModel():
     
     """
     This class builds GP and stores all data related to the true kernel

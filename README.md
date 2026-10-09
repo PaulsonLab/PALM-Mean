@@ -127,8 +127,8 @@ PALM-Mean/
 │   ├── Y.npy                   # Example training outputs (20 x 1, centered)
 │   └── params.json             # Example RBF hyperparameters
 ├── src/
-│   ├── BuildGP.py              # GPBuild: loads data, builds K, computes alpha = K^-1 y
-│   ├── Build_GP.py             # Build_GP(): wraps GPBuild, presolve, scaling, attaches settings
+│   ├── GPModel.py              # GPModel: trained GP - loads data, builds K, computes alpha = K^-1 y
+│   ├── ProblemSetup.py         # setup_problem(): GPModel + presolve + scaled box + solver settings
 │   ├── BranchBound1.py         # B&B driver: preprocessing, Node, branching, pruning, main loop
 │   ├── LowerBound.py           # get_LB(): node bounding = analytical part + PWL MIQCP part + local UB
 │   ├── Analytical_LB.py        # Distance bounds, importance split, closed-form bounds
@@ -204,8 +204,8 @@ This is a nonconvex MIQCP: the PWL pieces add binary variables, and the distance
 
 ```
 main.py
- └─ Build_GP(...)                          src/Build_GP.py
-     ├─ GPBuild(param_path, X_path, Y_path)  src/BuildGP.py  -> x, y, ℓ, σ_f, α = K⁻¹y
+ └─ setup_problem(...)                     src/ProblemSetup.py
+     ├─ GPModel(param_path, X_path, Y_path)  src/GPModel.py  -> x, y, ℓ, σ_f, α = K⁻¹y
      ├─ get_UB(..., n_multi=5) on [0,1]^d    presolve: initial incumbent UB*
      └─ convert to scaled space z = x / ℓ    (all B&B boxes live in z-space)
  └─ BranchBound(time_limit, GP_obj)         src/BranchBound1.py
@@ -258,6 +258,10 @@ pip install -r benchmarks/requirements.txt   # botorch, gpytorch, pandas, pyscip
 | `gp_prior` | Functions drawn from a GP prior; each seed draws $d\in\{4,\dots,9\}$ and $N\in\{300,\dots,599\}$ | 100 | 600 s |
 | `autoam` | Autonomous additive manufacturing data ($d=4$, $N=100$), maximize Score | 1 | 3600 s |
 | `benzylation` | N-benzylation flow reaction ($d=4$, $N=78$), minimize −STY + 100·max(impurity − 5 %, 0) | 1 | 600 s |
+
+**Data sources** (copies are in [`benchmarks/data/`](benchmarks/data)):
+- **AutoAM:** [`AutoAM_dataset.csv`](https://github.com/PV-Lab/Benchmarking/blob/main/datasets/AutoAM_dataset.csv) from the [PV-Lab/Benchmarking](https://github.com/PV-Lab/Benchmarking) repository.
+- **N-benzylation:** A. M. Schweidtmann, A. D. Clayton, N. Holmes, E. Bradford, R. A. Bourne, A. A. Lapkin. *Machine learning meets continuous flow chemistry: Automated optimization towards the Pareto front of multiple objectives.* Chemical Engineering Journal 352 (2018) 277–282. [doi:10.1016/j.cej.2018.07.031](https://www.sciencedirect.com/science/article/pii/S1385894718312634)
 
 ```sh
 # EggHolder, d = 2, four data sizes, 10 seeds each

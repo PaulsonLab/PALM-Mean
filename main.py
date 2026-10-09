@@ -3,7 +3,7 @@
 
 import torch
 from src.BranchBound1 import BranchBound
-from src.Build_GP import Build_GP
+from src.ProblemSetup import setup_problem
         
 if __name__=='__main__':
     
@@ -30,7 +30,7 @@ if __name__=='__main__':
     args_dict = {"Preprocess":Preprocess, "Thread_gurobi":Thread_gurobi, "PWL_segment":PWL_segment, "n_prepart":n_prepart,
                  "hyperparameter":hyperparameter, "abs_gap":abs_gap, "rel_gap":rel_gap, "n_multi":n_multi, "param_path":param_path, "X_path":X_path, "Y_path":Y_path}
 
-    GP_obj = Build_GP(**args_dict)
+    GP_obj = setup_problem(**args_dict)
 
 
     BestUpperBound, BestLowerBound, node_count, BestUpperBound_arg = BranchBound(time_limit, GP_obj)                         

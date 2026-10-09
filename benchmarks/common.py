@@ -20,7 +20,7 @@ import torch
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
-from src.BuildGP import GPBuild
+from src.GPModel import GPModel
 
 BENCH_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -198,8 +198,8 @@ def make_instance(problem, dim, n, seed, root):
 
 
 def load_instance(path):
-    """Return the repo's GPBuild object (alpha, lengthscales, sigma_f) and the instance metadata."""
-    gp = GPBuild(param_path=os.path.join(path, "params.json"), X_path=os.path.join(path, "X.npy"),
+    """Return the repo's GPModel object (alpha, lengthscales, sigma_f) and the instance metadata."""
+    gp = GPModel(param_path=os.path.join(path, "params.json"), X_path=os.path.join(path, "X.npy"),
                  Y_path=os.path.join(path, "Y.npy"))
     with open(os.path.join(path, "meta.json")) as f:
         meta = json.load(f)

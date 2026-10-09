@@ -3,16 +3,19 @@
 """
 Created on Wed Feb 19 21:38:08 2025
 
+Builds the object the B&B solver works on: the trained GP (GPModel) plus a presolve
+incumbent, the search box in lengthscale-scaled coordinates and the solver settings.
+
 @author: tang.1856
 """
 
 import torch
-from src.BuildGP import GPBuild
+from src.GPModel import GPModel
 from src.UpperBound import get_UB
 
-def Build_GP(Preprocess, Thread_gurobi,PWL_segment, n_prepart, hyperparameter, abs_gap, rel_gap, n_multi, param_path, X_path, Y_path):
+def setup_problem(Preprocess, Thread_gurobi,PWL_segment, n_prepart, hyperparameter, abs_gap, rel_gap, n_multi, param_path, X_path, Y_path):
     
-    GP_obj = GPBuild(param_path = param_path, X_path = X_path, Y_path = Y_path)
+    GP_obj = GPModel(param_path = param_path, X_path = X_path, Y_path = Y_path)
     
     l = GP_obj.l        
     X = GP_obj.x # haven't divide by length scale      

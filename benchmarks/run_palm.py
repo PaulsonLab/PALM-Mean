@@ -16,7 +16,7 @@ import json
 import torch
 from common import parse_args, iterate_instances, write_result, PALM_SETTINGS
 from src.BranchBound1 import BranchBound
-from src.Build_GP import Build_GP
+from src.ProblemSetup import setup_problem
 
 if __name__ == '__main__':
 
@@ -28,7 +28,7 @@ if __name__ == '__main__':
             meta = json.load(f)
 
         torch.manual_seed(seed) # random multistarts of the local upper-bounding solver
-        GP_obj = Build_GP(**PALM_SETTINGS, Thread_gurobi=args.threads, param_path=os.path.join(path, "params.json"),
+        GP_obj = setup_problem(**PALM_SETTINGS, Thread_gurobi=args.threads, param_path=os.path.join(path, "params.json"),
                           X_path=os.path.join(path, "X.npy"), Y_path=os.path.join(path, "Y.npy"))
 
         start_time = time.monotonic()
