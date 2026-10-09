@@ -3,109 +3,71 @@
 """
 Created on Wed Jun  7 09:14:51 2023
 
-GPModel holds a trained GP: it loads the training data and RBF hyperparameters,
-computes alpha = (K + noise*I)^-1 y and evaluates the posterior mean.
-It does not fit hyperparameters (see benchmarks/common.py for fitting).
+Trained GP model. GPModel loads the training data and RBF hyperparameters of an
+already trained GP, computes alpha = (K + noise*I)^-1 y and evaluates the posterior mean
+
+    mu(x) = sum_i alpha_i * sigma_f^2 * exp(-0.5 * ||(x - x_i)/l||^2).
+
+Hyperparameters are not fitted here (see benchmarks/common.py for fitting).
 
 @author: kudva.7
 """
-import torch
-import numpy as np 
 import json
-    
- 
-def RBF_Matrix(X, lengthscale, fscale, noise):
-    
-    """
-    Used to generate the RBF Kernel covariance matrix in a fast manner
-    Parameters
-    ----------
-    X : Features of GP-- torch tensor n_samples X ndim
-    
-    Hyper parameters: 
-        
-    -> lengthscale
-    -> fscale  
-    -> noise  
+import numpy as np
+import torch
 
-    Returns
-    -------
-    K : Covariance Matrix torch matrix (n_samples X n_samples)
 
+def RBF_Matrix(Z, sigma_f, noise):
     """
-       
-    n_samples = X.size(dim = 0)
-    pairwise_distances_sq = torch.cdist(X, X, p=2).pow(2)
-    K = (fscale ** 2) * torch.exp(-0.5 * pairwise_distances_sq / lengthscale ** 2)
-    
-    # Set the diagonal elements to represent the variance (noise)
-    I = torch.eye(n_samples)
-    I.diagonal().fill_(noise.squeeze(0))
-    
-    # Final kernel with jitter
-    K += I
-   
-    return K
-   
+    Covariance matrix K + noise*I of the RBF kernel.
+
+    Z       : training inputs divided by the lengthscales -- tensor (N x dim)
+    sigma_f : kernel standard deviation (sqrt of the signal variance)
+    noise   : observation-noise variance -- tensor of shape (1,)
+    """
+    K = (sigma_f ** 2) * torch.exp(-0.5 * torch.cdist(Z, Z, p=2).pow(2))
+
+    I = torch.eye(Z.size(dim=0))
+    I.diagonal().fill_(noise.squeeze(0)) # noise variance on the diagonal
+    return K + I
+
 
 class GPModel():
-    
     """
-    This class builds GP and stores all data related to the true kernel
-    
-    Present SetUp: Will just be using the scaled GP for branch and bound procedures for now
-    
-    _____________________
+    Trained GP with an ARD squared-exponential (RBF) kernel and zero prior mean.
+
     Inputs:
-      
-        X_train: Unscaled Inputs to the GP model -- torch tensor  (N X ndim)
-        Y_train: Unscaled Output Mapping to the GP Model -- torch tensor (N X 1)
-        bounds: Bounds of the problem -- torch tensor (2 X ndim)       
-    
+        param_path : JSON file with '.kernel.variance', '.kernel.lengthscales', '.likelihood.variance'
+        X_path     : training inputs, .npy array (N x dim), scaled to [0,1]^dim
+        Y_path     : training outputs, .npy array (N x 1), centered
+
+    Attributes:
+        x, y    : training data (x in the original input space)
+        dim     : input dimension
+        l       : lengthscales -- tensor (1 x dim)
+        sigma_f : kernel standard deviation
+        jitter  : observation-noise variance
+        alpha   : (K + noise*I)^-1 y -- tensor (N x 1)
     """
-    
-    def __init__(self, param_path, X_path, Y_path):     
-        
-        # Load JSON from a file
+
+    def __init__(self, param_path, X_path, Y_path):
+
         with open(param_path, "r") as f:
-            data = json.load(f)
-        
+            params = json.load(f)
+
         self.x = torch.tensor(np.load(X_path)).to(torch.float64)
         self.y = torch.tensor(np.load(Y_path))
         self.dim = self.x.shape[1]
-        
-        self.l = torch.tensor([data['.kernel.lengthscales']]).to(torch.float64)
-        self.sigma_f = torch.tensor(data['.kernel.variance']).to(torch.float64)**0.5
-        self.jitter = torch.tensor([data['.likelihood.variance']]).to(torch.float64)
-        self.alpha = self.MeanComp()
-        
-            
-    def MeanComp(self): # We get the components of the mean function
-       
-        self.K = RBF_Matrix(self.x/self.l, 1, self.sigma_f, self.jitter) # calculate the covariance matrix   
-        self.K_inv = torch.inverse(self.K)
-       
-        alpha = torch.matmul(self.K_inv, self.y) # calculate the alpha vector
-        return alpha
-    
-    def update(self, X_new, Y_new): # Update data for new samples
-    
-        # Unscaled
-        self.X = torch.cat((self.X,X_new))
-        self.Y = torch.cat((self.Y,Y_new))
 
-        # Scaled values        
-        self.x = self.MaxMinScale()
-        self.y = self.StandardScale()
-        
-        # Retrieve hyper parameters for first iteration
-        self.model, self.l, self.sigma_f, self.jitter = self.train()        
-        self.alpha = self.MeanComp()            
-        
+        self.l = torch.tensor([params['.kernel.lengthscales']]).to(torch.float64)
+        self.sigma_f = torch.tensor(params['.kernel.variance']).to(torch.float64)**0.5
+        self.jitter = torch.tensor([params['.likelihood.variance']]).to(torch.float64)
+
+        self.K = RBF_Matrix(self.x/self.l, self.sigma_f, self.jitter)
+        self.K_inv = torch.inverse(self.K)
+        self.alpha = torch.matmul(self.K_inv, self.y)
+
     def posterior_mean(self, x):
+        """Posterior mean at a single point x (numpy array, original input space)."""
         distance = np.linalg.norm(self.x/self.l - x/self.l, axis=1)
-        mean = np.sum(np.array(self.alpha.flatten())*self.sigma_f.numpy()**2*np.exp(-0.5*distance**2))
-        return mean
-        
-        
-    
+        return np.sum(np.array(self.alpha.flatten())*self.sigma_f.numpy()**2*np.exp(-0.5*distance**2))

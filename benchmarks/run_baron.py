@@ -11,15 +11,12 @@ Examples:
 """
 import sys
 import pyomo.environ as pyo
-from common import parse_args, iterate_instances, load_instance, write_result, PALM_SETTINGS
+from common import parse_args, iterate_instances, load_instance, scaled_problem, write_result, PALM_SETTINGS
 
 
 def build_model(gp):
     """Posterior mean in lengthscale-scaled coordinates z = x/l, z in [0, 1/l]."""
-    Z = (gp.x/gp.l).tolist() # convert x to z space
-    zU = (1/gp.l).flatten().tolist()
-    alpha = gp.alpha.flatten().tolist()
-    s_f = float(gp.sigma_f)
+    Z, zU, alpha, s_f = scaled_problem(gp)
     dim = len(zU)
 
     model = pyo.ConcreteModel()

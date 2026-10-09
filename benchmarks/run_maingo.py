@@ -8,16 +8,16 @@ Examples:
     python benchmarks/run_maingo.py --problem schwefel --dim 6 --n 100
 """
 import maingopy as mg
-from common import parse_args, iterate_instances, load_instance, write_result, PALM_SETTINGS
+from common import parse_args, iterate_instances, load_instance, scaled_problem, write_result, PALM_SETTINGS
 
 
 class GPMeanModel(mg.MAiNGOmodel):
-    def __init__(self, alpha, x_center, zU, f_scale):
-        mg.MAiNGOmodel.__init__(self) # Should be there for technical reasons
-        self.alpha = alpha
-        self.x_center = x_center
+    def __init__(self, Z, zU, alpha, s_f):
+        mg.MAiNGOmodel.__init__(self) # required by MAiNGO
+        self.Z = Z
         self.zU = zU
-        self.f_scale = f_scale
+        self.alpha = alpha
+        self.s_f = s_f
 
     def get_variables(self):
         return [mg.OptimizationVariable(mg.Bounds(0.0, self.zU[j]), mg.VT_CONTINUOUS, "z%d" % (j+1)) for j in range(len(self.zU))]
@@ -27,8 +27,8 @@ class GPMeanModel(mg.MAiNGOmodel):
         for i in range(len(self.alpha)):
             distance_square = 0
             for j in range(len(self.zU)):
-                distance_square += (z[j] - self.x_center[i][j])**2
-            mean += self.alpha[i]*self.f_scale**2*mg.exp(-0.5*distance_square)
+                distance_square += (z[j] - self.Z[i][j])**2
+            mean += self.alpha[i]*self.s_f**2*mg.exp(-0.5*distance_square)
 
         result = mg.EvaluationContainer()
         result.objective = mean
@@ -41,9 +41,7 @@ if __name__ == '__main__':
 
     for path, seed in iterate_instances(args):
         gp, meta = load_instance(path)
-        Z = (gp.x/gp.l).tolist() # convert x to z space
-        zU = (1/gp.l).flatten().tolist()
-        model = GPMeanModel(gp.alpha.flatten().tolist(), Z, zU, float(gp.sigma_f))
+        model = GPMeanModel(*scaled_problem(gp))
 
         solver = mg.MAiNGO(model)
         solver.set_option("maxTime", args.time_limit)

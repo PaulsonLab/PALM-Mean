@@ -3,108 +3,62 @@
 """
 Created on Thu Feb 20 19:22:30 2025
 
+Closed-form (analytical) bounds of kernel terms over a box, and the importance split.
+Everything is in lengthscale-scaled coordinates z = x/l.
+
 @author: tang.1856
 """
 import torch
-import sys
 
-def active_corners(theta_min,theta_max):
+
+def distance_bounds(bounds, Z):
     """
-    This code is mainly used to generate all corners of box constraints.
-    Will be incorporated in the Object that will give us the bounds.
-
-    inputs:
-    theta_min -- N dimensional tensor
-    theta_max -- N dimensional tensor
-
-    output -- 2^(N) X N dimensional tensor
+    Smallest and largest Euclidean distance between each center Z_i and the box [bounds[0], bounds[1]].
+    The nearest point is the projection of Z_i onto the box; the farthest point is a vertex,
+    chosen coordinatewise as the box edge farther from Z_i.
     """
-    size_t1 = torch.Tensor.size(theta_min)
-    size_t2 = torch.Tensor.size(theta_max)
+    Z = Z.to(torch.float64)
+    bounds = bounds.to(torch.float64)
+    dist_near = torch.norm(Z - torch.clamp(Z, bounds[0], bounds[1]), p=2, dim=1)
+    dist_far = torch.norm(torch.maximum((Z-bounds[0]).abs(), (Z-bounds[1]).abs()), p=2, dim=1)
+    return dist_near, dist_far
 
-    # Show error if dimensions dont match:
-    if size_t1 != size_t2:
-        sys.exit('The dimensions of bounds dont match: Please enter valid inputs')
 
-    val = size_t1[0]
-    size_out = 2**(val)
-    output = torch.zeros(size_out,val)
-    output_iter = torch.zeros(size_out)
+def analytic_bound(alpha, sigma_f, dist_near, dist_far):
+    """
+    Sign-aware lower bound of sum_i alpha_i * sigma_f^2 * exp(-0.5 d_i^2) with d_i in [dist_near, dist_far]:
+    a positive term is smallest at the largest distance, a negative term at the smallest distance.
+    """
+    opt_dist = torch.where(alpha > 0, dist_far, dist_near)
+    return torch.sum(alpha*(sigma_f**2)*torch.exp(-0.5*opt_dist.pow(2)))
 
-    for i in range(val):
-        div_size = int(size_out/(2**(i+1)))
-        divs = int(size_out/div_size)
-        div_count = 0
-        for j in range(divs):
-            if bool(j%2):
-                output_iter[div_count:div_count+div_size] = theta_min[i]*torch.ones(div_size)
-            else:
-                output_iter[div_count:div_count+div_size] = theta_max[i]*torch.ones(div_size)
-            div_count = div_count + div_size
-        output[:,i] = output_iter
-    return output
 
 def get_analytic(bounds, BO_obj):
-    hyperparam = BO_obj.hyperparameter
-    sigma_f = BO_obj.sigma_f
-    alpha = BO_obj.alpha
-    X = BO_obj.X
-    alpha = alpha.flatten()   
-    X2 = X.to(torch.float64)
-    bounds = bounds.to(torch.float64)
+    """
+    Split the kernel terms on a box into unimportant and important ones.
 
-    # maximum distance between each center point and the box: the farthest vertex is found coordinatewise
-    # (avoids enumerating all 2^dim corners and the float32 rounding of the previous cdist-based version)
-    far_offset = torch.maximum((X2-bounds[0]).abs(), (X2-bounds[1]).abs())
-    dist_center_corner = torch.norm(far_offset,p=2,dim=1)
+    A term is unimportant if its largest possible magnitude on the box, |alpha_i| * k_i(dist_near),
+    is below the threshold rho (BO_obj.hyperparameter); unimportant terms are bounded analytically.
 
-    # -----------------------------Below calculate the max(abs(alpha*k)) for each center-------------------------------------------------------------------------------------------------------------------------------------------------
-    # Find the projection point of each center point on the box
-    X_project = torch.min(X2,bounds[1].unsqueeze(0).expand_as(X2))
-    X_project = torch.max(X_project,bounds[0].unsqueeze(0).expand_as(X2))
-    
-    # Calculate distance between center point and projected point
-    dist_center_proj = torch.norm(X2-X_project,p=2,dim=1)     
-    dist1_new = dist_center_proj.flatten().to(torch.float64)
-    
-    kernel_val_at_proj = abs(alpha*sigma_f**2*torch.exp(-0.5 * dist1_new**2))
-    bool_index1_new = kernel_val_at_proj<hyperparam
-    bool_index2_new = ~bool_index1_new
-    
-    index1 = (bool_index1_new.nonzero()).squeeze(-1) # kernel satisfying the heuristic rule
-    index2 = (bool_index2_new.nonzero()).squeeze(-1) # kernel doesn't satisfy the heuristic rule
-    
-    if len(index1)>0:
-        
-        alpha1 = (alpha[index1]).squeeze(-1) # alpha term for analytical lower bounding group     
-                       
-        loop_val = len(index1)
-        opt_dist = torch.empty(loop_val)
-        
-        # --------------------------Below calculate the analytical bound----------------------------------------------------------------------------------------
-        dist_max_vals = dist_center_corner[index1]
-        dist_negative_alpha = (dist_center_proj[index1]).to(torch.float64)
-               
-        opt_dist = torch.zeros_like(dist_max_vals)
-           
-        opt_dist[alpha1>0] = dist_max_vals[alpha1>0] # for positive alpha, the minimum alpha*k is at the largest distance between the center point and the corner
-        opt_dist[alpha1<0] = dist_negative_alpha[alpha1<0] # for negative alpha, the minimum alpha*k is at the projection point
-           
-        alpha1K1 = alpha1*(sigma_f**2) * torch.exp(-0.5 * opt_dist.pow(2))
-        Sigma1 = torch.sum(alpha1K1) # This is the analytical bound
-    else:
-        Sigma1 = torch.tensor(0)
- 
-    return Sigma1, index2, dist_center_proj, dist_center_corner
+    Returns:
+        Sigma1    : analytical lower bound of the unimportant terms
+        index2    : indices of the important terms (bounded by the PWL MIQCP)
+        dist_near : smallest distance between each center and the box
+        dist_far  : largest distance between each center and the box
+    """
+    alpha = BO_obj.alpha.flatten()
+    dist_near, dist_far = distance_bounds(bounds, BO_obj.X)
+
+    importance = abs(alpha*BO_obj.sigma_f**2*torch.exp(-0.5 * dist_near**2))
+    unimportant = importance < BO_obj.hyperparameter
+    index1 = unimportant.nonzero().squeeze(-1)
+    index2 = (~unimportant).nonzero().squeeze(-1)
+
+    Sigma1 = analytic_bound(alpha[index1], BO_obj.sigma_f, dist_near[index1], dist_far[index1])
+    return Sigma1, index2, dist_near, dist_far
+
 
 def get_analytic_all(bounds, BO_obj):
-    # Analytical bound with every kernel term treated as unimportant (cheap, valid but loose)
-    alpha = BO_obj.alpha.flatten()
-    X = BO_obj.X.to(torch.float64)
-    bounds = bounds.to(torch.float64)
-    dist_near = torch.norm(X - torch.clamp(X, bounds[0], bounds[1]), p=2, dim=1)
-    dist_far = torch.norm(torch.maximum((X-bounds[0]).abs(), (X-bounds[1]).abs()), p=2, dim=1)
-    opt_dist = torch.where(alpha>0, dist_far, dist_near)
-    return torch.sum(alpha*(BO_obj.sigma_f**2)*torch.exp(-0.5*opt_dist.pow(2)))
-
-    
+    """Analytical lower bound with every kernel term treated as unimportant (cheap, valid but loose)."""
+    dist_near, dist_far = distance_bounds(bounds, BO_obj.X)
+    return analytic_bound(BO_obj.alpha.flatten(), BO_obj.sigma_f, dist_near, dist_far)

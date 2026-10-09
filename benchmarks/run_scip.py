@@ -42,17 +42,14 @@ def solve_SCIP(Z, zU, alpha, s_f, mu_LB, mu_UB, abs_gap, rel_gap, time_limit):
 
 if __name__ == '__main__':
     import multiprocessing as mp
-    from common import parse_args, iterate_instances, load_instance, interval_bounds, write_result, PALM_SETTINGS
+    from common import parse_args, iterate_instances, load_instance, scaled_problem, interval_bounds, write_result, PALM_SETTINGS
 
     args = parse_args("Solve benchmark instances with SCIP")
 
     with mp.get_context("spawn").Pool(1) as pool:
         for path, seed in iterate_instances(args):
             gp, meta = load_instance(path)
-            Z = (gp.x/gp.l).tolist() # convert x to z space
-            zU = (1/gp.l).flatten().tolist()
-            mu_LB, mu_UB = interval_bounds(gp)
-            LB, UB, solve_time, n_node = pool.apply(solve_SCIP, (Z, zU, gp.alpha.flatten().tolist(), float(gp.sigma_f), mu_LB, mu_UB,
+            LB, UB, solve_time, n_node = pool.apply(solve_SCIP, (*scaled_problem(gp), *interval_bounds(gp),
                                                                  PALM_SETTINGS["abs_gap"], PALM_SETTINGS["rel_gap"], args.time_limit))
             write_result(args, "scip", {"dim": meta["dim"], "n": meta["n"], "seed": seed, "time_s": solve_time,
                                         "nodes": n_node, "ub": UB, "lb": LB})

@@ -10,11 +10,9 @@ Examples:
     python benchmarks/run_palm.py --problem autoam --threads 16
     python benchmarks/run_palm.py --problem benzylation --threads 16
 """
-import os
 import time
-import json
 import torch
-from common import parse_args, iterate_instances, write_result, PALM_SETTINGS
+from common import parse_args, iterate_instances, instance_paths, load_meta, write_result, PALM_SETTINGS
 from src.BranchBound1 import BranchBound
 from src.ProblemSetup import setup_problem
 
@@ -24,12 +22,10 @@ if __name__ == '__main__':
     torch.set_num_threads(args.threads)
 
     for path, seed in iterate_instances(args):
-        with open(os.path.join(path, "meta.json")) as f:
-            meta = json.load(f)
+        meta = load_meta(path)
 
         torch.manual_seed(seed) # random multistarts of the local upper-bounding solver
-        GP_obj = setup_problem(**PALM_SETTINGS, Thread_gurobi=args.threads, param_path=os.path.join(path, "params.json"),
-                          X_path=os.path.join(path, "X.npy"), Y_path=os.path.join(path, "Y.npy"))
+        GP_obj = setup_problem(**PALM_SETTINGS, Thread_gurobi=args.threads, **instance_paths(path))
 
         start_time = time.monotonic()
         BestUpperBound, BestLowerBound, node_count, BestUpperBound_arg = BranchBound(args.time_limit, GP_obj)

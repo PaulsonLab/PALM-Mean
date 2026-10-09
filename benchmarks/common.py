@@ -5,8 +5,8 @@ Shared code for the benchmark scripts: test problems, GP fitting, instance
 caching, interval bounds and result logging.
 
 Every benchmark instance is written once to <instances>/<name>/ in the same
-format main.py reads (X.npy, Y.npy, params.json), so PALM-Mean, SCIP and
-MAiNGO all solve exactly the same GP posterior mean.
+format main.py reads (X.npy, Y.npy, params.json), so PALM-Mean, SCIP, MAiNGO
+and BARON all solve exactly the same GP posterior mean.
 """
 import os
 import sys
@@ -21,6 +21,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 from src.GPModel import GPModel
+from src.Analytical_LB import distance_bounds, analytic_bound
 
 BENCH_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -81,7 +82,8 @@ def synthetic_GP_prior(x, dim, lscale):
 
 
 # ---------------------------------------------------------------- problems
-# name: (domain lower, domain upper, GP noise upper bound, default time limit)
+# bounds: box of every input (None: problem-specific), noise: upper bound of the GP noise variance,
+# time_limit: default time limit per instance (s)
 PROBLEMS = {
     "eggholder": {"bounds": (-512., 512.), "noise": 1e-4, "time_limit": 600},
     "schwefel":  {"bounds": (-500., 500.), "noise": 1e-4, "time_limit": 600},
@@ -197,25 +199,41 @@ def make_instance(problem, dim, n, seed, root):
     return path
 
 
+def instance_paths(path):
+    """Keyword arguments locating an instance's GP files, as taken by GPModel and setup_problem."""
+    return {"param_path": os.path.join(path, "params.json"), "X_path": os.path.join(path, "X.npy"),
+            "Y_path": os.path.join(path, "Y.npy")}
+
+
+def load_meta(path):
+    """Instance metadata: problem, dim, n, seed, original bounds, output mean and std."""
+    with open(os.path.join(path, "meta.json")) as f:
+        return json.load(f)
+
+
 def load_instance(path):
     """Return the repo's GPModel object (alpha, lengthscales, sigma_f) and the instance metadata."""
-    gp = GPModel(param_path=os.path.join(path, "params.json"), X_path=os.path.join(path, "X.npy"),
-                 Y_path=os.path.join(path, "Y.npy"))
-    with open(os.path.join(path, "meta.json")) as f:
-        meta = json.load(f)
-    return gp, meta
+    return GPModel(**instance_paths(path)), load_meta(path)
+
+
+def scaled_problem(gp):
+    """
+    The posterior mean in lengthscale-scaled coordinates z = x/l, as plain Python floats for the
+    algebraic modeling interfaces of SCIP, MAiNGO and BARON:
+        mu(z) = sum_k alpha[k] * sigma_f^2 * exp(-0.5 * ||z - Z[k]||^2),   z in [0, zU].
+    """
+    Z = (gp.x/gp.l).tolist()
+    zU = (1/gp.l).flatten().tolist()
+    return Z, zU, gp.alpha.flatten().tolist(), float(gp.sigma_f)
 
 
 def interval_bounds(gp):
-    """Analytical lower/upper bounds of the posterior mean over [0,1]^d (used to bound SCIP's objective variable)."""
+    """Analytical lower/upper bounds of the posterior mean over the whole box (bounds SCIP's objective variable)."""
     alpha = gp.alpha.flatten()
-    Z = gp.x/gp.l # centers in scaled space
-    zL, zU = torch.zeros(Z.shape[1], dtype=torch.float64), (1/gp.l).flatten()
-    dist_near = torch.norm(Z - torch.clamp(Z, zL, zU), dim=1)
-    dist_far = torch.norm(torch.maximum((Z - zL).abs(), (Z - zU).abs()), dim=1)
-    k = lambda d: gp.sigma_f**2*torch.exp(-0.5*d**2)
-    mu_LB = torch.sum(torch.where(alpha > 0, alpha*k(dist_far), alpha*k(dist_near)))
-    mu_UB = torch.sum(torch.where(alpha > 0, alpha*k(dist_near), alpha*k(dist_far)))
+    box = torch.stack((torch.zeros(gp.dim, dtype=torch.float64), (1/gp.l).flatten()))
+    dist_near, dist_far = distance_bounds(box, gp.x/gp.l)
+    mu_LB = analytic_bound(alpha, gp.sigma_f, dist_near, dist_far)
+    mu_UB = -analytic_bound(-alpha, gp.sigma_f, dist_near, dist_far) # upper bound of sum = -(lower bound of -sum)
     return float(mu_LB), float(mu_UB)
 
 
