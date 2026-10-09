@@ -139,6 +139,7 @@ PALM-Mean/
 │   ├── run_palm.py             # Run PALM-Mean (src/, main.py settings) on a benchmark
 │   ├── run_scip.py             # Same instances with SCIP
 │   ├── run_maingo.py           # Same instances with MAiNGO
+│   ├── run_baron.py            # Same instances with BARON (via Pyomo)
 │   ├── requirements.txt        # Extra packages for the benchmarks
 │   └── data/                   # AutoAM and N-benzylation data sets
 └── figure/
@@ -244,10 +245,10 @@ Implementation details:
 
 ### Running the benchmarks
 
-[`benchmarks/`](benchmarks) reproduces the paper's test problems and compares PALM-Mean with SCIP and MAiNGO. PALM-Mean is the unmodified solver in `src/` with the settings in `main.py`. Install the extra packages first:
+[`benchmarks/`](benchmarks) reproduces the paper's test problems and compares PALM-Mean with SCIP, MAiNGO and BARON. PALM-Mean is the unmodified solver in `src/` with the settings in `main.py`. Install the extra packages first:
 
 ```sh
-pip install -r benchmarks/requirements.txt   # botorch, gpytorch, pandas, pyscipopt, maingopy
+pip install -r benchmarks/requirements.txt   # botorch, gpytorch, pandas, pyscipopt, maingopy, pyomo
 ```
 
 | `--problem` | Description | Default replicates | Time limit |
@@ -263,6 +264,7 @@ pip install -r benchmarks/requirements.txt   # botorch, gpytorch, pandas, pyscip
 python benchmarks/run_palm.py   --problem eggholder --dim 2 --n 100 500 1000 1500
 python benchmarks/run_scip.py   --problem eggholder --dim 2 --n 100 500 1000 1500
 python benchmarks/run_maingo.py --problem eggholder --dim 2 --n 100 500 1000 1500
+python benchmarks/run_baron.py  --problem eggholder --dim 2 --n 100 500 1000 1500
 
 # Schwefel: d = 6 with increasing N, and N = 400 with increasing d (16 Gurobi threads)
 python benchmarks/run_palm.py --problem schwefel --dim 6 --n 100 200 300 400 500 600 --threads 16
@@ -274,11 +276,13 @@ python benchmarks/run_palm.py --problem autoam --threads 16
 python benchmarks/run_palm.py --problem benzylation --threads 16
 ```
 
+BARON is commercial: `run_baron.py` needs the `baron` executable on the PATH and a valid [BARON license](https://minlp.com/baron-licenses). It exits with a message if BARON is not found.
+
 Other options are `--replicates`, `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`.
 
 How the benchmark scripts work:
 
-- **Instances.** For each instance, the training data is generated from Latin hypercube samples seeded by the replicate number. It is identical to `pyDOE2.lhs(d, N, random_state=seed)` as used in the paper. Inputs are scaled to $[0,1]^d$ and outputs standardized. A zero-mean ARD-RBF GP is then fitted with BoTorch, and the result is written to `benchmarks/instances/<name>/` in the same format as `data/`. Instances are cached, so all three solvers optimize exactly the same posterior mean. Any instance can also be solved with `main.py` by pointing it to that folder.
+- **Instances.** For each instance, the training data is generated from Latin hypercube samples seeded by the replicate number. It is identical to `pyDOE2.lhs(d, N, random_state=seed)` as used in the paper. Inputs are scaled to $[0,1]^d$ and outputs standardized. A zero-mean ARD-RBF GP is then fitted with BoTorch, and the result is written to `benchmarks/instances/<name>/` in the same format as `data/`. Instances are cached, so all solvers optimize exactly the same posterior mean. Any instance can also be solved with `main.py` by pointing it to that folder.
 - **Results.** Each run appends a row to `benchmarks/results/<solver>_<problem>.csv` with these columns:
   - dimension, $N$, seed
   - time (s) and number of nodes
@@ -286,7 +290,7 @@ How the benchmark scripts work:
   - `solved`: gap ≤ 0.1 or ≤ 1 % of |UB|
 
   UB and LB are in standardized output units.
-- **Timing.** PALM-Mean reports wall-clock time of the B&B, SCIP reports `getSolvingTime()`, and MAiNGO reports `get_cpu_solution_time()`.
+- **Timing.** PALM-Mean reports wall-clock time of the B&B, SCIP reports `getSolvingTime()`, MAiNGO reports `get_cpu_solution_time()`, and BARON reports the solver time returned through Pyomo.
 - **Windows only.** On Windows, SCIP runs in a separate process: pyscipopt and torch each bundle an Intel OpenMP runtime, and they crash if both are loaded in one process.
 
 ### Results reported in the paper
