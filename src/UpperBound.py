@@ -26,7 +26,7 @@ def get_UB(sigma_f, alpha, x_center, xL, xU, n_multi):
     for i in range(len(xL)):
         bounds.append((float(xL[i]),float(xU[i])))
     
-    optimal_obj = 1e5
+    optimal_obj = float('inf')
     for multi in range(n_multi):
         x0 = xL + (xU-xL)*torch.rand(len(xL))
         x0 = x0.numpy()

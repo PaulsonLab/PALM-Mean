@@ -31,7 +31,7 @@ def get_LB(bounds, BO_obj=None, Thread=3, Best_UB = 1000):
     x_arg1, UB = get_UB(BO_obj.sigma_f,  BO_obj.alpha, BO_obj.X, xL_BB, xU_BB, BO_obj.n_multi)
     
     # print('number of IMPORTANT group=',len(index2))
-    if len(index2)>=0:
+    if len(index2)>0:
     
         if UB - BO_obj.Best_UB>0.51:
             gap = (UB - BO_obj.Best_UB) - 0.5

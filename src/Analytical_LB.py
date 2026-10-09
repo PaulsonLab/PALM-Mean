@@ -50,15 +50,18 @@ def get_analytic(bounds, BO_obj):
     alpha = BO_obj.alpha
     X = BO_obj.X
     alpha = alpha.flatten()   
-    X2 = X.to(torch.float)
-   
-    corners = active_corners(bounds[0],bounds[1]) # get the vertex of the spatial hypercube
-    dist_center_corner = torch.cdist(corners, X2,p=2).max(0).values.to(torch.float64) # maximum distance between corners and each center point
-    
+    X2 = X.to(torch.float64)
+    bounds = bounds.to(torch.float64)
+
+    # maximum distance between each center point and the box: the farthest vertex is found coordinatewise
+    # (avoids enumerating all 2^dim corners and the float32 rounding of the previous cdist-based version)
+    far_offset = torch.maximum((X2-bounds[0]).abs(), (X2-bounds[1]).abs())
+    dist_center_corner = torch.norm(far_offset,p=2,dim=1)
+
     # -----------------------------Below calculate the max(abs(alpha*k)) for each center-------------------------------------------------------------------------------------------------------------------------------------------------
     # Find the projection point of each center point on the box
-    X_project = torch.min(X2,bounds[1].unsqueeze(0).expand_as(X))
-    X_project = torch.max(X_project,bounds[0].unsqueeze(0).expand_as(X))
+    X_project = torch.min(X2,bounds[1].unsqueeze(0).expand_as(X2))
+    X_project = torch.max(X_project,bounds[0].unsqueeze(0).expand_as(X2))
     
     # Calculate distance between center point and projected point
     dist_center_proj = torch.norm(X2-X_project,p=2,dim=1)     
@@ -93,5 +96,15 @@ def get_analytic(bounds, BO_obj):
         Sigma1 = torch.tensor(0)
  
     return Sigma1, index2, dist_center_proj, dist_center_corner
+
+def get_analytic_all(bounds, BO_obj):
+    # Analytical bound with every kernel term treated as unimportant (cheap, valid but loose)
+    alpha = BO_obj.alpha.flatten()
+    X = BO_obj.X.to(torch.float64)
+    bounds = bounds.to(torch.float64)
+    dist_near = torch.norm(X - torch.clamp(X, bounds[0], bounds[1]), p=2, dim=1)
+    dist_far = torch.norm(torch.maximum((X-bounds[0]).abs(), (X-bounds[1]).abs()), p=2, dim=1)
+    opt_dist = torch.where(alpha>0, dist_far, dist_near)
+    return torch.sum(alpha*(BO_obj.sigma_f**2)*torch.exp(-0.5*opt_dist.pow(2)))
 
     

@@ -12,6 +12,7 @@ import time
 import math
 import itertools
 from src.LowerBound import get_LB
+from src.Analytical_LB import get_analytic_all
 
 def partition_bounds(xL, xU, partitions):
     dimensions = len(xL)
@@ -74,9 +75,16 @@ def PrePross(RootNode, x_arg = None, time_limit=None, Part = 3, BO_obj=None):
         DecisionNodes.append(DecisionNode)    
         end_time_pre = time.time()
         if end_time_pre - start_time_pre>time_limit:
-            break        
-    
-    return DecisionNodes,UpperBoundList,LowerBoundList, len(DecisionNodes)
+            break
+
+    # Boxes skipped because of the time limit still belong to the domain: bound them analytically
+    unexplored_LB = float('inf')
+    for i in range(len(DecisionNodes), len(x_LB)):
+        unexplored_LB = min(unexplored_LB, float(get_analytic_all(torch.stack((x_LB[i], x_UB[i])), BO_obj)))
+    if len(DecisionNodes) < len(x_LB):
+        print('Pre-process exceeds specified time limit! %d of %d boxes bounded analytically only' % (len(x_LB)-len(DecisionNodes), len(x_LB)))
+
+    return DecisionNodes,UpperBoundList,LowerBoundList, len(DecisionNodes), unexplored_LB
 
 
 # Find the lower bounding procedure
@@ -206,13 +214,14 @@ def BranchBound(time_limit, BO_obj):
     # Root node
     RootNode = Node(xL, xU, RootNode=True, BO_obj=BO_obj)
  
-    DecisionNodes, UpperBoundList, LowerBoundList, n_pre_nodes = PrePross(RootNode, time_limit=time_limit, BO_obj=BO_obj)
-    
+    DecisionNodes, UpperBoundList, LowerBoundList, n_pre_nodes, unexplored_LB = PrePross(RootNode, time_limit=time_limit, BO_obj=BO_obj)
+
     iter_count, node_count = n_pre_nodes, n_pre_nodes
-    
+
     DecisionNodes = np.array(DecisionNodes)
     LowerBoundList = np.array(LowerBoundList)
     Ncondition = 3
+    BestLowerBound = min(float(np.min(LowerBoundList)), unexplored_LB)
     
   
     while np.any(DecisionNodes): # If there is any child node remaining in the DecisionNodes list
@@ -230,7 +239,7 @@ def BranchBound(time_limit, BO_obj):
            
             
         if np.min(LowerBoundList)<=BO_obj.Best_UB and Ncondition==3:
-            BestLowerBound = np.min(LowerBoundList)
+            BestLowerBound = min(float(np.min(LowerBoundList)), unexplored_LB)
         
         if end_time_BB-start_time_BB>=time_limit:
             print('B&B process exceeds specified time limit!')
