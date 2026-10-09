@@ -6,6 +6,7 @@ Find the global minimum of a trained GP posterior mean over [0,1]^d with PALM-Me
 import torch
 from src.BranchBound1 import BranchBound
 from src.ProblemSetup import setup_problem
+from src.Report import print_results
 
 if __name__=='__main__':
 
@@ -29,8 +30,5 @@ if __name__=='__main__':
     torch.set_num_threads(Thread_gurobi)
     GP_obj = setup_problem(**settings, **paths)
 
-    BestUpperBound, BestLowerBound, node_count, BestUpperBound_arg = BranchBound(time_limit, GP_obj)
-
-    print('x* = ', BestUpperBound_arg)
-    print('Minimum posterior mean = ', BestUpperBound)
-    print('Absolute Gap = ', BestUpperBound - BestLowerBound)
+    BranchBound(time_limit, GP_obj)
+    print_results(GP_obj)

@@ -62,21 +62,36 @@ To check that the license works, run `python -c "import gurobipy as gp; gp.Model
 python main.py
 ```
 
-This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints something like:
+This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints a summary:
 
 ```
-x* =  tensor([[0.4457, 0.4568, 0.6762]], dtype=torch.float64)
-Minimum posterior mean =  -1.6607193097371928
-Absolute Gap =  0.025950985561651763
+====================================================================
+ PALM-Mean result
+====================================================================
+ Status               : Converged: global minimum certified within tolerance
+ Minimum value        : -1.660719   (posterior mean at x*, best upper bound)
+ Lower bound          : -1.686670   (certified: mean >= this everywhere in the box)
+ Absolute gap         : 0.025951   (tolerance 0.1)
+ Relative gap         : 1.56 %     (tolerance 1 %)
+ x*                   : [0.445704, 0.456800, 0.676200]
+--------------------------------------------------------------------
+ Problem              : d = 3, N = 20 training points
+ Settings             : rho = 0.01, 6 PWL segments, 1 Gurobi thread(s)
+ Nodes bounded        : 343 (343 preprocessing boxes + 0 from branching)
+ Time                 : 1.8 s (preprocessing 1.8 s, B&B 0.0 s)
+====================================================================
 ```
 
-| Output | Meaning |
+| Line | Meaning |
 |---|---|
-| `x*` | Best point found (the incumbent), in the original input space. |
-| `Minimum posterior mean` | $\mu(x^*)$, the best upper bound $\mathrm{UB}^*$. |
-| `Absolute Gap` | $\mathrm{UB}^* - \mathrm{LB}^*$. The global minimum is guaranteed to lie in $[\mathrm{LB}^*, \mathrm{UB}^*]$. |
+| `Status` | `Converged` when the gap meets either tolerance. Otherwise `Time limit reached`, and an `Open nodes left` line shows how many boxes were still unresolved. If preprocessing was cut short, the boxes it did not reach are bounded analytically and the status says so. |
+| `Minimum value` | $\mu(x^*)$, the best upper bound $\mathrm{UB}^*$. |
+| `Lower bound` | $\mathrm{LB}^*$: the posterior mean is at least this value everywhere in the box, so the global minimum lies in $[\mathrm{LB}^*, \mathrm{UB}^*]$. The certificate stays valid when the time limit is hit; it is just looser. |
+| `Absolute gap`, `Relative gap` | $\mathrm{UB}^* - \mathrm{LB}^*$, and that difference divided by $\lvert\mathrm{UB}^*\rvert$. |
+| `x*` | Best point found, in the input space of `X.npy`. |
+| `Nodes bounded`, `Time` | Search effort, split into preprocessing and branching. |
 
-If the time limit is reached, the run prints `B&B process exceeds specified time limit!` and the reported gap is still a valid (but looser) certificate.
+The same values are available in code from `GP_obj.result` (a dict) after `BranchBound(time_limit, GP_obj)` returns.
 
 ## Using your own GP
 
@@ -133,7 +148,8 @@ PALM-Mean/
 │   ├── LowerBound.py           # get_LB(): node bounding = analytical part + PWL MIQCP part + local UB
 │   ├── Analytical_LB.py        # Distance bounds, importance split, closed-form bounds
 │   ├── PWL_Custom_LB.py        # Gurobi MIQCP with sign-aware PWL objective (setPWLObj)
-│   └── UpperBound.py           # Multistart L-BFGS-B on the true posterior mean
+│   ├── UpperBound.py           # Multistart L-BFGS-B on the true posterior mean
+│   └── Report.py               # print_results(): human-readable summary of a run
 ├── benchmarks/
 │   ├── common.py               # Test problems, GP fitting (BoTorch), instance cache, result logging
 │   ├── run_palm.py             # Run PALM-Mean (src/, main.py settings) on a benchmark
@@ -215,6 +231,8 @@ main.py
          ├─ pick node with min LB; update UB* from node upper bounds
          ├─ BranchOrPrune: prune (LB > UB*, node converged, or within tolerance of UB*)
          └─ or SpatialBranching: bisect longest edge -> 2 child Nodes
+     └─ store run statistics in GP_obj.result
+ └─ print_results(GP_obj)                   src/Report.py
 
 Node(xL, xU) -> get_LB(bounds)              src/LowerBound.py
  ├─ get_analytic(bounds)                    src/Analytical_LB.py

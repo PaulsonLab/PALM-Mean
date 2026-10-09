@@ -50,8 +50,8 @@ def PrePross(BO_obj, time_limit):
     Pre-partition the root box into at most 500 sub-boxes with comparable diagonals (if BO_obj.PreProcess)
     and bound each of them.
 
-    Returns the bounded nodes, their upper and lower bounds, and an analytical lower bound for the
-    boxes that could not be bounded before the time limit (inf if all were bounded).
+    Returns the bounded nodes, their upper and lower bounds, an analytical lower bound for the boxes
+    that could not be bounded before the time limit (inf if all were bounded), and the number of boxes.
     """
     xL, xU = BO_obj.xL, BO_obj.xU
     dim = len(xL)
@@ -83,10 +83,8 @@ def PrePross(BO_obj, time_limit):
     unexplored_LB = float('inf')
     for i in range(len(DecisionNodes), len(x_LB)):
         unexplored_LB = min(unexplored_LB, float(get_analytic_all(torch.stack((x_LB[i], x_UB[i])), BO_obj)))
-    if len(DecisionNodes) < len(x_LB):
-        print('Pre-process exceeds specified time limit! %d of %d boxes bounded analytically only' % (len(x_LB)-len(DecisionNodes), len(x_LB)))
 
-    return DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB
+    return DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB, len(x_LB)
 
 
 def SpatialBranching(node, BO_obj):
@@ -131,11 +129,14 @@ def BranchBound(time_limit, BO_obj):
     Run the B&B on the box [BO_obj.xL, BO_obj.xU] (see setup_problem).
 
     Returns (best upper bound, best lower bound, number of nodes, best point in x-space).
+    Run statistics are also stored in BO_obj.result (see src/Report.py).
     """
     start_time_BB = time.time()
 
-    DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB = PrePross(BO_obj, time_limit)
-    node_count = len(DecisionNodes)
+    DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB, n_boxes = PrePross(BO_obj, time_limit)
+    node_count = n_bounded = len(DecisionNodes)
+    time_preprocess = time.time() - start_time_BB
+    timed_out = False
 
     DecisionNodes = np.array(DecisionNodes)
     LowerBoundList = np.array(LowerBoundList)
@@ -157,7 +158,7 @@ def BranchBound(time_limit, BO_obj):
             BestLowerBound = min(float(np.min(LowerBoundList)), unexplored_LB)
 
         if time.time() - start_time_BB >= time_limit:
-            print('B&B process exceeds specified time limit!')
+            timed_out = True
             break
 
         condition, children = BranchOrPrune(DecisionNodes[k], BO_obj.Best_UB, BO_obj)
@@ -178,5 +179,10 @@ def BranchBound(time_limit, BO_obj):
             DecisionNodes = np.delete(DecisionNodes, [k])
             LowerBoundList = np.delete(LowerBoundList, [k])
             UpperBoundList = np.delete(UpperBoundList, [k])
+
+    BO_obj.result = {"UB": BO_obj.Best_UB, "LB": BestLowerBound, "x": BO_obj.Best_UB_arg,
+                     "nodes": node_count, "preprocess_boxes": n_boxes, "unexplored_boxes": n_boxes - n_bounded,
+                     "active_nodes": len(DecisionNodes), "timed_out": timed_out, "time_limit": time_limit,
+                     "time_preprocess": time_preprocess, "time_total": time.time() - start_time_BB}
 
     return BO_obj.Best_UB, BestLowerBound, node_count, BO_obj.Best_UB_arg
