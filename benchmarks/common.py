@@ -162,9 +162,10 @@ def fit_gp(x, y, noise):
                          mean_module=gpytorch.means.ZeroMean(), outcome_transform=None)
     fit_gpytorch_mll(ExactMarginalLogLikelihood(likelihood, model))
 
-    params = {".kernel.variance": float(model.covar_module.outputscale),
+    # detach: the fitted hyperparameters still carry autograd history
+    params = {".kernel.variance": float(model.covar_module.outputscale.detach()),
               ".kernel.lengthscales": model.covar_module.base_kernel.lengthscale.detach().flatten().tolist(),
-              ".likelihood.variance": float(model.likelihood.noise)}
+              ".likelihood.variance": float(model.likelihood.noise.detach())}
     return params
 
 
