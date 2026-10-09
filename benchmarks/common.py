@@ -257,9 +257,12 @@ def parse_args(description, palm=False):
     parser.add_argument("--problem", required=True, choices=list(PROBLEMS))
     parser.add_argument("--dim", type=int, nargs="+", default=[2], help="input dimension(s) (eggholder/schwefel)")
     parser.add_argument("--n", type=int, nargs="+", default=[100], help="number(s) of training points (eggholder/schwefel)")
+    parser.add_argument("--seeds", type=int, nargs="+", default=None,
+                        help="run exactly these seeds, e.g. --seeds 7 or --seeds 4 7 9 (overrides --replicates/--seed-start)")
     parser.add_argument("--replicates", type=int, default=None,
-                        help="seeds 0..R-1 (default: 10 eggholder, 40 schwefel, 100 gp_prior, 1 autoam/benzylation)")
-    parser.add_argument("--seed-start", type=int, default=0)
+                        help="number of seeds R: seeds seed-start..seed-start+R-1 "
+                             "(default: 10 eggholder, 40 schwefel, 100 gp_prior, 1 autoam/benzylation)")
+    parser.add_argument("--seed-start", type=int, default=0, help="first seed when using --replicates (default 0)")
     parser.add_argument("--time-limit", type=float, default=None, help="seconds (default: 600, 3600 for autoam)")
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--instances", default=os.path.join(BENCH_DIR, "instances"), help="cache directory for GP instances")
@@ -276,7 +279,7 @@ def parse_args(description, palm=False):
 
 def iterate_instances(args):
     """Yield (instance path, seed) for every requested configuration."""
-    seeds = range(args.seed_start, args.seed_start + args.replicates)
+    seeds = args.seeds if args.seeds is not None else range(args.seed_start, args.seed_start + args.replicates)
     if args.problem in ("gp_prior", "autoam", "benzylation"):
         configs = [(None, None)]
     else:

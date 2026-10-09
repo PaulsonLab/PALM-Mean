@@ -316,7 +316,16 @@ python benchmarks/run_palm.py --problem benzylation --threads 16
 
 BARON is commercial: `run_baron.py` needs the `baron` executable on the PATH and a valid [BARON license](https://minlp.com/baron-licenses). It exits with a message if BARON is not found.
 
-Other options are `--replicates`, `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints progress every 100 nodes and the full results summary of every run.
+To run specific seeds, list them with `--seeds`. It overrides `--replicates`, and the instance for a given seed is the same for every solver:
+
+```sh
+# Schwefel, d = 6, N = 500, seeds 7 and 9 only
+python benchmarks/run_palm.py   --problem schwefel --dim 6 --n 500 --seeds 7 9 --threads 16
+python benchmarks/run_scip.py   --problem schwefel --dim 6 --n 500 --seeds 7 9
+python benchmarks/run_maingo.py --problem schwefel --dim 6 --n 500 --seeds 7 9
+```
+
+Other options are `--replicates` (run seeds `0..R-1`), `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints progress every 100 nodes and the full results summary of every run.
 
 How the benchmark scripts work:
 
