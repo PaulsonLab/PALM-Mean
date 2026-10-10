@@ -6,10 +6,6 @@ This repository contains the reference implementation of **PALM-Mean** (**P**iec
 
 PALM-Mean finds the **certified global minimum** of a trained Gaussian process (GP) posterior mean over a box. It is a reduced-space spatial branch-and-bound (B&B) method. On each node, kernel terms that strongly affect the posterior mean are bounded with a sign-aware piecewise-linear (PWL) relaxation, and all other terms are bounded in closed form.
 
-![Demo](figure/palm_mean_1d(3).gif)
-
-*1-D illustration of PALM-Mean: posterior mean (black), node lower-bounding functions, incumbent, and the active boxes as the search proceeds. The animation was made with [`figure/animate_palm_mean_1d.py`](figure/animate_palm_mean_1d.py).*
-
 ---
 
 ## Contents
