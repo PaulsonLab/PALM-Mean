@@ -62,7 +62,7 @@ To check that the license works, run `python -c "import gurobipy as gp; gp.Model
 python main.py
 ```
 
-This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints a summary. The output below is from a run with `"Preprocess": False` in `main.py` (branching starts from the root box). With the default `True`, the root box is first split into a grid of up to 500 boxes, and the `Nodes bounded` and `Time` lines show those preprocessing boxes instead.
+This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints a summary. The output below is from `python main.py --no-preprocess` (branching starts from the root box). With the default `True`, the root box is first split into a grid of up to 500 boxes, and the `Nodes bounded` and `Time` lines show those preprocessing boxes instead.
 
 ```
 ====================================================================
@@ -98,7 +98,7 @@ The same values are available in code from `GP_obj.result` (a dict) after `Branc
 
 ## Using your own GP
 
-PALM-Mean takes a **trained** GP. Hyperparameters are not re-fitted. Provide three files and set their paths in [`main.py`](main.py):
+PALM-Mean takes a **trained** GP. Hyperparameters are not re-fitted. Provide three files and pass their paths to [`main.py`](main.py) with `--params`, `--X` and `--Y`:
 
 | File | Content |
 |---|---|
@@ -130,20 +130,27 @@ From these values the code builds $\mu(x)=\sum_i \alpha_i\,\sigma_f^2\exp\!\big(
 
 ## Solver settings
 
-All settings are at the top of [`main.py`](main.py):
+All settings are command-line options of [`main.py`](main.py) (`python main.py --help` lists them):
 
-| Parameter | Default | Description |
+```sh
+python main.py --time-limit 1200 --threads 16 --no-preprocess
+python main.py --params my_gp/params.json --X my_gp/X.npy --Y my_gp/Y.npy --abs-gap 0.05
+```
+
+| Option | Default | Description |
 |---|---|---|
-| `time_limit` | `600` | Wall-clock limit (s) for preprocessing and B&B combined. |
-| `abs_gap` | `0.1` | Absolute optimality tolerance $\varepsilon_{\rm abs}$. |
-| `rel_gap` | `0.01` | Relative optimality tolerance $\varepsilon_{\rm rel}$. A node is fathomed once **either** tolerance is met. |
-| `hyperparameter` | `0.01` | Importance threshold $\rho$. Terms with $\beta_{i,h}\ge\rho$ get the PWL relaxation, the rest are bounded analytically. $\rho=0$ relaxes every term with PWL (tightest bounds, slowest solves). |
-| `PWL_segment` | `6` | Number of PWL segments per important kernel term. |
-| `Preprocess` | `True` | Pre-partition the root box into sub-boxes with comparable diagonals, capped at 500 boxes. |
-| `n_prepart` | `10` | Starting number of partitions along the diagonal for preprocessing. Reduced automatically until there are at most 500 boxes. |
-| `n_multi` | `2` | Number of random L-BFGS-B starts per node for the upper bound. |
-| `Thread_gurobi` | `1` | Threads used by Gurobi for each node MIQCP (and by torch). |
-| `log_every` | `100` | Print a progress line every 100 generated nodes; `0` turns progress output off. |
+| `--params`, `--X`, `--Y` | `data/params.json`, `data/X.npy`, `data/Y.npy` | The trained GP (see [Using your own GP](#using-your-own-gp)). |
+| `--time-limit` | `600` | Wall-clock limit (s) for preprocessing and B&B combined. |
+| `--threads` | `1` | Threads used by Gurobi for each node MIQCP (and by torch). |
+| `--abs-gap` | `0.1` | Absolute optimality tolerance $\varepsilon_{\rm abs}$. |
+| `--rel-gap` | `0.01` | Relative optimality tolerance $\varepsilon_{\rm rel}$. A node is fathomed once **either** tolerance is met. |
+| `--rho` | `0.01` | Importance threshold $\rho$. Terms with $\beta_{i,h}\ge\rho$ get the PWL relaxation, the rest are bounded analytically. $\rho=0$ relaxes every term with PWL (tightest bounds, slowest solves). |
+| `--pwl-segments` | `6` | Number of PWL segments per important kernel term. |
+| `--preprocess` / `--no-preprocess` | on | Pre-partition the root box into sub-boxes with comparable diagonals, capped at 500 boxes. |
+| `--n-prepart` | `10` | Starting number of partitions along the diagonal for preprocessing. Reduced automatically until there are at most 500 boxes. |
+| `--n-multi` | `2` | Number of random L-BFGS-B starts per node for the upper bound. |
+| `--log-every` | `100` | Print a progress line every 100 generated nodes; `0` turns progress output off. |
+| `--seed` | none | Random seed for the local-search starts, for reproducible runs. |
 
 The paper's experiments use $\rho=0.01$, 6 PWL segments, $\varepsilon_{\rm abs}=0.1$ and $\varepsilon_{\rm rel}=0.01$.
 
@@ -151,7 +158,7 @@ The paper's experiments use $\rho=0.01$, 6 PWL segments, $\varepsilon_{\rm abs}=
 
 ```
 PALM-Mean/
-├── main.py                     # Entry point: settings, data paths, runs B&B, prints result
+├── main.py                     # Entry point: command-line options, runs B&B, prints result
 ├── requirements.txt            # torch, numpy, scipy, gurobipy
 ├── data/
 │   ├── X.npy                   # Example training inputs  (20 x 3, in [0,1]^3)
@@ -279,7 +286,7 @@ Implementation details:
 
 ### Running the benchmarks
 
-[`benchmarks/`](benchmarks) reproduces the paper's test problems and compares PALM-Mean with SCIP, MAiNGO and BARON. PALM-Mean is the unmodified solver in `src/` with the settings in `main.py`. Install the extra packages first:
+[`benchmarks/`](benchmarks) reproduces the paper's test problems and compares PALM-Mean with SCIP, MAiNGO and BARON. PALM-Mean is the unmodified solver in `src/` with the default settings of `main.py`. Install the extra packages first:
 
 ```sh
 pip install -r benchmarks/requirements.txt   # botorch, gpytorch, pandas, pyscipopt, maingopy, pyomo
@@ -329,7 +336,7 @@ Other options are `--replicates` (run seeds `0..R-1`), `--seed-start`, `--time-l
 
 How the benchmark scripts work:
 
-- **Instances.** For each instance, the training data is generated from Latin hypercube samples seeded by the replicate number. It is identical to `pyDOE2.lhs(d, N, random_state=seed)` as used in the paper. Inputs are scaled to $[0,1]^d$ and outputs standardized. A zero-mean ARD-RBF GP is then fitted with BoTorch, and the result is written to `benchmarks/instances/<name>/` in the same format as `data/`. Instances are cached, so all solvers optimize exactly the same posterior mean. Any instance can also be solved with `main.py` by pointing it to that folder.
+- **Instances.** For each instance, the training data is generated from Latin hypercube samples seeded by the replicate number. It is identical to `pyDOE2.lhs(d, N, random_state=seed)` as used in the paper. Inputs are scaled to $[0,1]^d$ and outputs standardized. A zero-mean ARD-RBF GP is then fitted with BoTorch, and the result is written to `benchmarks/instances/<name>/` in the same format as `data/`. Instances are cached, so all solvers optimize exactly the same posterior mean. Any instance can also be solved with `main.py`, e.g. `python main.py --params benchmarks/instances/<name>/params.json --X benchmarks/instances/<name>/X.npy --Y benchmarks/instances/<name>/Y.npy`.
 - **Results.** Each run appends a row to `benchmarks/results/<solver>_<problem>.csv` with these columns:
   - dimension, $N$, seed
   - time (s) and number of nodes
