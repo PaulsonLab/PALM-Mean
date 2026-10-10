@@ -4,7 +4,7 @@
 Solve the same benchmark instances with SCIP (full-space formulation of the posterior mean).
 
 The posterior mean is written in lengthscale-scaled coordinates z = x/l as
-    t = sum_k alpha_k sigma_f^2 exp(-0.5 ||z - z_k||^2),   z in [0, 1/l],
+    t = sum_k alpha_k sigma_f^2 k(||z - z_k||),   z in [0, 1/l],
 and SCIP minimizes t, whose bounds are given by interval arithmetic.
 
 Examples:
@@ -13,10 +13,11 @@ Examples:
 """
 # Only numpy and pyscipopt are imported at module level: SCIP runs in a child process that must
 # not load torch, because pyscipopt and torch each bundle an Intel OpenMP runtime that clash on Windows.
-from pyscipopt import Model, quicksum, exp
+from pyscipopt import Model, quicksum, exp, sqrt
+from kernel_expression import kernel_expression
 
 
-def solve_SCIP(Z, zU, alpha, s_f, mu_LB, mu_UB, abs_gap, rel_gap, time_limit):
+def solve_SCIP(Z, zU, alpha, s_f, kernel_name, mu_LB, mu_UB, abs_gap, rel_gap, time_limit):
     dim = len(zU)
 
     model = Model("GP posterior mean")
@@ -26,7 +27,7 @@ def solve_SCIP(Z, zU, alpha, s_f, mu_LB, mu_UB, abs_gap, rel_gap, time_limit):
     mean = 0
     for k in range(len(Z)):
         distance_square = quicksum((z[d] - Z[k][d])**2 for d in range(dim))
-        mean += alpha[k]*s_f**2*exp(-0.5*distance_square)
+        mean += alpha[k]*s_f**2*kernel_expression(kernel_name, distance_square, sqrt, exp)
 
     t = model.addVar(vtype="C", lb=mu_LB, ub=mu_UB)
     model.addCons(t == mean)

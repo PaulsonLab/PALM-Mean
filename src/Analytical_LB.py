@@ -24,13 +24,14 @@ def distance_bounds(bounds, Z):
     return dist_near, dist_far
 
 
-def analytic_bound(alpha, sigma_f, dist_near, dist_far):
+def analytic_bound(alpha, sigma_f, dist_near, dist_far, kernel):
     """
-    Sign-aware lower bound of sum_i alpha_i * sigma_f^2 * exp(-0.5 d_i^2) with d_i in [dist_near, dist_far]:
-    a positive term is smallest at the largest distance, a negative term at the smallest distance.
+    Sign-aware lower bound of sum_i alpha_i * sigma_f^2 * k(d_i) with d_i in [dist_near, dist_far]. Every
+    supported kernel decreases with distance, so a positive term is smallest at the largest distance and a
+    negative term at the smallest distance.
     """
     opt_dist = torch.where(alpha > 0, dist_far, dist_near)
-    return torch.sum(alpha*(sigma_f**2)*torch.exp(-0.5*opt_dist.pow(2)))
+    return torch.sum(alpha*(sigma_f**2)*kernel.k(opt_dist))
 
 
 def get_analytic(bounds, BO_obj):
@@ -49,16 +50,16 @@ def get_analytic(bounds, BO_obj):
     alpha = BO_obj.alpha.flatten()
     dist_near, dist_far = distance_bounds(bounds, BO_obj.X)
 
-    importance = abs(alpha*BO_obj.sigma_f**2*torch.exp(-0.5 * dist_near**2))
+    importance = abs(alpha*BO_obj.sigma_f**2*BO_obj.kernel.k(dist_near))
     unimportant = importance < BO_obj.hyperparameter
     index1 = unimportant.nonzero().squeeze(-1)
     index2 = (~unimportant).nonzero().squeeze(-1)
 
-    Sigma1 = analytic_bound(alpha[index1], BO_obj.sigma_f, dist_near[index1], dist_far[index1])
+    Sigma1 = analytic_bound(alpha[index1], BO_obj.sigma_f, dist_near[index1], dist_far[index1], BO_obj.kernel)
     return Sigma1, index2, dist_near, dist_far
 
 
 def get_analytic_all(bounds, BO_obj):
     """Analytical lower bound with every kernel term treated as unimportant (cheap, valid but loose)."""
     dist_near, dist_far = distance_bounds(bounds, BO_obj.X)
-    return analytic_bound(BO_obj.alpha.flatten(), BO_obj.sigma_f, dist_near, dist_far)
+    return analytic_bound(BO_obj.alpha.flatten(), BO_obj.sigma_f, dist_near, dist_far, BO_obj.kernel)

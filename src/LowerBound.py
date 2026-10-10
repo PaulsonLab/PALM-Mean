@@ -25,7 +25,7 @@ def get_LB(bounds, BO_obj, Thread=1):
 
     Sigma1, index2, dist_near, dist_far = get_analytic(bounds, BO_obj)
 
-    z_arg, UB = get_UB(BO_obj.sigma_f, BO_obj.alpha, BO_obj.X, zL, zU, BO_obj.n_multi)
+    z_arg, UB = get_UB(BO_obj.sigma_f, BO_obj.alpha, BO_obj.X, zL, zU, BO_obj.n_multi, BO_obj.kernel)
 
     if len(index2) > 0:
         # Adaptive MIQCP tolerance: a node whose local UB is far above the incumbent does not need a tight bound

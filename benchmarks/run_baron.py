@@ -11,12 +11,13 @@ Examples:
 """
 import sys
 import pyomo.environ as pyo
+from kernel_expression import kernel_expression
 from common import parse_args, iterate_instances, load_instance, scaled_problem, write_result, PALM_SETTINGS
 
 
 def build_model(gp):
     """Posterior mean in lengthscale-scaled coordinates z = x/l, z in [0, 1/l]."""
-    Z, zU, alpha, s_f = scaled_problem(gp)
+    Z, zU, alpha, s_f, kernel_name = scaled_problem(gp)
     dim = len(zU)
 
     model = pyo.ConcreteModel()
@@ -26,7 +27,7 @@ def build_model(gp):
         mean = 0
         for k in range(len(Z)):
             distance_square = sum((model.z[d] - Z[k][d])**2 for d in range(dim))
-            mean += alpha[k]*s_f**2*pyo.exp(-0.5*distance_square)
+            mean += alpha[k]*s_f**2*kernel_expression(kernel_name, distance_square, pyo.sqrt, pyo.exp)
         return mean
 
     model.OBJ = pyo.Objective(rule=posterior_mean, sense=pyo.minimize)

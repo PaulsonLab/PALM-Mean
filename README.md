@@ -120,7 +120,7 @@ PALM-Mean takes a **trained** GP. Hyperparameters are not re-fitted. Provide thr
 |---|---|
 | `X.npy` | Training inputs, `float64` array of shape `(N, d)`. **The search domain is fixed to $[0,1]^d$**, so scale your inputs to the unit box first. |
 | `Y.npy` | Training outputs, array of shape `(N, 1)`. A zero prior mean is assumed, so **center (or standardize) the outputs** the same way they were centered when the GP was trained. |
-| `params.json` | Hyperparameters of the ARD squared-exponential (RBF) kernel, using GPflow-style keys (see below). |
+| `params.json` | Kernel type and hyperparameters of the ARD kernel (squared-exponential/RBF or Matérn 1/2, 3/2, 5/2), using GPflow-style keys (see below). |
 
 ```json
 {".kernel.variance": 1.0, ".kernel.lengthscales": [0.1, 0.1, 0.1], ".likelihood.variance": 0.0001}
@@ -129,6 +129,11 @@ PALM-Mean takes a **trained** GP. Hyperparameters are not re-fitted. Provide thr
 - `.kernel.variance`: signal variance $\sigma_f^2$
 - `.kernel.lengthscales`: one lengthscale $\ell_j$ per input dimension
 - `.likelihood.variance`: observation-noise variance $\sigma_\varepsilon^2$
+- `.kernel.type` (optional): `"rbf"` (default when the key is absent), `"matern12"`, `"matern32"` or `"matern52"`. GPflow-style names such as `"Matern32"` are also accepted.
+
+```json
+{".kernel.type": "matern32", ".kernel.variance": 1.0, ".kernel.lengthscales": [0.1, 0.1, 0.1], ".likelihood.variance": 0.0001}
+```
 
 Optionally, also give the normalization you applied to the data, so the results are reported in original units. It is used only for reporting, never by the solver:
 
@@ -142,7 +147,7 @@ Optionally, also give the normalization you applied to the data, so the results 
 
 The benchmark scripts write these keys automatically.
 
-From these values the code builds $\mu(x)=\sum_i \alpha_i\,\sigma_f^2\exp\!\big(-\tfrac12\lVert L^{-1}(x-x_i)\rVert^2\big)$ with $\alpha=(K+\sigma_\varepsilon^2 I)^{-1}y$. If you trained the GP in BoTorch/GPyTorch or scikit-learn, copy the fitted outputscale, lengthscales and noise into these three keys.
+From these values the code builds $\mu(x)=\sum_i \alpha_i\,\sigma_f^2\,k\big(\lVert L^{-1}(x-x_i)\rVert\big)$ with $\alpha=(K+\sigma_\varepsilon^2 I)^{-1}y$ (kernels listed under [Matérn kernels](#matérn-kernels)). If you trained the GP in BoTorch/GPyTorch or scikit-learn, copy the kernel type and the fitted outputscale, lengthscales and noise into these keys. In GPyTorch, `MaternKernel(nu=0.5/1.5/2.5)` corresponds to `matern12`/`matern32`/`matern52`.
 
 ## Solver settings
 
@@ -186,6 +191,7 @@ PALM-Mean/
 │   ├── BranchBound1.py         # B&B driver: preprocessing, Node, branching, pruning, main loop
 │   ├── LowerBound.py           # get_LB(): node bounding = analytical part + PWL MIQCP part + local UB
 │   ├── Analytical_LB.py        # Distance bounds, importance split, closed-form bounds
+│   ├── Kernels.py              # RBF and Matern 1/2, 3/2, 5/2 kernels: k(r), dk/dr, inflection point
 │   ├── PWL_Custom_LB.py        # Gurobi MIQCP with sign-aware PWL objective (setPWLObj)
 │   ├── UpperBound.py           # Multistart L-BFGS-B on the true posterior mean
 │   └── Report.py               # print_results(): human-readable summary of a run
@@ -195,6 +201,7 @@ PALM-Mean/
 │   ├── run_scip.py             # Same instances with SCIP
 │   ├── run_maingo.py           # Same instances with MAiNGO
 │   ├── run_baron.py            # Same instances with BARON (via Pyomo)
+│   ├── kernel_expression.py    # Kernel as an algebraic expression for SCIP/MAiNGO/BARON
 │   ├── requirements.txt        # Extra packages for the benchmarks
 │   └── data/                   # AutoAM and N-benzylation data sets
 └── figure/
@@ -206,7 +213,7 @@ PALM-Mean/
 
 ### Problem
 
-For a GP with an ARD squared-exponential kernel, the posterior mean is
+For a GP with an ARD squared-exponential kernel, the posterior mean is shown below. The Matérn kernels follow the same scheme with a different PWL variable; see [Matérn kernels](#matérn-kernels).
 
 $$
 \mu(x)=\sum_{i=1}^{N}\alpha_i\,k_i(x),\qquad
@@ -243,6 +250,26 @@ $$
 $$
 
 This is a nonconvex MIQCP: the PWL pieces add binary variables, and the distance equalities are nonconvex quadratics. Gurobi solves it, and its **best bound** (`ObjBound`) is used. That value is a valid lower bound even if Gurobi stops early. Only the important terms enter the MIQCP, so its size depends on how many terms matter locally, not on $N$.
+
+### Matérn kernels
+
+With $r=\lVert L^{-1}(x-x_i)\rVert$, the supported kernels are (without $\sigma_f^2$):
+
+| Kernel | $k(r)$ | Curvature in $r$ |
+|---|---|---|
+| Matérn 1/2 (`matern12`) | $e^{-r}$ | convex everywhere |
+| Matérn 3/2 (`matern32`) | $(1+\sqrt3\,r)\,e^{-\sqrt3\,r}$ | concave for $r<1/\sqrt3$, convex for $r>1/\sqrt3$ |
+| Matérn 5/2 (`matern52`) | $(1+\sqrt5\,r+\tfrac53 r^2)\,e^{-\sqrt5\,r}$ | concave for $r<\tfrac{5+\sqrt5}{10}$, convex for $r>\tfrac{5+\sqrt5}{10}$ |
+
+All are decreasing in $r$, so steps 1–3 above apply unchanged with $k$ in place of $e^{-d/2}$. The PWL relaxation (step 4) is built in $r$ instead of $d$, with the constraint $r_i^2=\lVert L^{-1}(x-x_i)\rVert^2$, $r_i\ge0$. Matérn 3/2 and 5/2 are **not convex in $r$**: they change from concave to convex at the inflection point $r^\ast$. Each term $f_i=\alpha_i\sigma_f^2k(r)$ on $[r_i^L,r_i^U]$ is therefore handled piece by piece:
+
+- **Split at the inflection point.** If $r_i^L<r^\ast<r_i^U$, the interval is split at $r^\ast$, and each side gets its own envelope with $S$ segments. Intervals entirely on one side (including those that end exactly at $r^\ast$) keep a single piece.
+- **Sign-aware curvature.** On each side, $f_i$ has the curvature of $k$ when $\alpha_i>0$, and the opposite curvature when $\alpha_i<0$. For Matérn 3/2 and 5/2 with $\alpha_i<0$, $f_i$ is convex left of $r^\ast$ and concave right of it.
+- **Envelope per piece.** Where $f_i$ is convex, use the maximum of the two end-point tangents on each segment. Where it is concave, use chords. Both pieces pass through $(r^\ast,f_i(r^\ast))$, so the PWL function is continuous and lies below $f_i$ on the whole interval.
+
+Two cases need special care:
+- **Near-zero-width interval** ($r_i^U-r_i^L<10^{-5}$): Gurobi cannot use it as a PWL domain. Such a term is bounded by the exact constant $\min(f_i(r_i^L),f_i(r_i^U))$.
+- **Tangent intersection outside its segment** (possible only through rounding): the midpoint is used, with the lower of the two tangents there, which keeps the envelope valid.
 
 ### Branch-and-bound
 
@@ -348,11 +375,13 @@ python benchmarks/run_scip.py   --problem schwefel --dim 6 --n 500 --seeds 7 9
 python benchmarks/run_maingo.py --problem schwefel --dim 6 --n 500 --seeds 7 9
 ```
 
-Other options are `--replicates` (run seeds `0..R-1`), `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints progress every 100 nodes and the full results summary of every run.
+Use `--kernel` to fit a Matern GP instead of the default RBF, e.g. `python benchmarks/run_palm.py --problem schwefel --dim 6 --n 500 --seeds 7 --kernel matern32`. Matern instances and results are stored separately, with the kernel name appended to their names.
+
+Other options are `--kernel`, `--replicates` (run seeds `0..R-1`), `--seed-start`, `--time-limit`, `--threads`, `--instances` and `--out`; see `--help`. With `--report`, `run_palm.py` also prints progress every 100 nodes and the full results summary of every run.
 
 How the benchmark scripts work:
 
-- **Instances.** For each instance, the training data is generated from Latin hypercube samples seeded by the replicate number. It is identical to `pyDOE2.lhs(d, N, random_state=seed)` as used in the paper. Inputs are scaled to $[0,1]^d$ and outputs standardized. A zero-mean ARD-RBF GP is then fitted with BoTorch, and the result is written to `benchmarks/instances/<name>/` in the same format as `data/`. Instances are cached, so all solvers optimize exactly the same posterior mean. Any instance can also be solved with `main.py`, e.g. `python main.py --params benchmarks/instances/<name>/params.json --X benchmarks/instances/<name>/X.npy --Y benchmarks/instances/<name>/Y.npy`.
+- **Instances.** For each instance, the training data is generated from Latin hypercube samples seeded by the replicate number. It is identical to `pyDOE2.lhs(d, N, random_state=seed)` as used in the paper. Inputs are scaled to $[0,1]^d$ and outputs standardized. A zero-mean ARD GP is then fitted with BoTorch, with an RBF kernel or, with `--kernel matern12|matern32|matern52`, a Matern kernel, and the result is written to `benchmarks/instances/<name>/` in the same format as `data/`. Instances are cached, so all solvers optimize exactly the same posterior mean. Any instance can also be solved with `main.py`, e.g. `python main.py --params benchmarks/instances/<name>/params.json --X benchmarks/instances/<name>/X.npy --Y benchmarks/instances/<name>/Y.npy`.
 - **Results.** Each run appends a row to `benchmarks/results/<solver>_<problem>.csv` with these columns:
   - dimension, $N$, seed
   - time (s) and number of nodes
@@ -459,9 +488,9 @@ PALM-Mean needs 2–3 orders of magnitude fewer B&B nodes than general-purpose s
 
 ## Limitations
 
-- Only the **squared-exponential (RBF) kernel** is implemented. The paper also covers Matérn-1/2, 3/2 and 5/2 kernels; support for these will be released later.
+- Supported kernels are the ARD **squared-exponential (RBF)** and **Matérn 1/2, 3/2 and 5/2** kernels.
 - The search domain is hard-coded to the **unit box** $[0,1]^d$, and a **zero prior mean** is assumed.
-- Each locally important term adds a distance variable, a quadratic constraint and a PWL objective to the node MIQCP. Node cost therefore grows with the number of important terms; increase `hyperparameter` ($\rho$) to trade bound tightness for speed.
+- Each locally important term adds a distance variable, a quadratic constraint and a PWL objective to the node MIQCP. Node cost therefore grows with the number of important terms; increase `--rho` ($\rho$) to trade bound tightness for speed.
 
 ## Citation
 

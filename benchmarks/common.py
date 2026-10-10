@@ -143,20 +143,26 @@ def generate_data(problem, dim, n, seed):
     return X, Y, torch.stack((x_min, x_max)).to(torch.float64), dim, n
 
 
-def fit_gp(x, y, noise):
+MATERN_NU = {"matern12": 0.5, "matern32": 1.5, "matern52": 2.5}
+
+
+def fit_gp(x, y, noise, kernel_name="rbf"):
     """
-    Fit a zero-mean GP with an ARD RBF kernel by maximum likelihood (BoTorch).
+    Fit a zero-mean GP with an ARD RBF or Matern kernel by maximum likelihood (BoTorch).
     x must already be scaled to [0,1]^d and y standardized.
     """
     import gpytorch
-    from gpytorch.kernels import RBFKernel, ScaleKernel
+    from gpytorch.kernels import RBFKernel, MaternKernel, ScaleKernel
     from gpytorch.constraints import Positive, GreaterThan, Interval
     from gpytorch.mlls import ExactMarginalLogLikelihood
     from botorch.fit import fit_gpytorch_mll
     from botorch.models import SingleTaskGP
 
-    kernel = ScaleKernel(RBFKernel(ard_num_dims=x.shape[1], lengthscale_constraint=GreaterThan(1e-3)),
-                         outputscale_constraint=Positive())
+    if kernel_name == "rbf":
+        base = RBFKernel(ard_num_dims=x.shape[1], lengthscale_constraint=GreaterThan(1e-3))
+    else:
+        base = MaternKernel(nu=MATERN_NU[kernel_name], ard_num_dims=x.shape[1], lengthscale_constraint=GreaterThan(1e-3))
+    kernel = ScaleKernel(base, outputscale_constraint=Positive())
     likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=Interval(0, noise))
     model = SingleTaskGP(x, y, likelihood=likelihood, covar_module=kernel,
                          mean_module=gpytorch.means.ZeroMean(), outcome_transform=None)
@@ -166,20 +172,24 @@ def fit_gp(x, y, noise):
     params = {".kernel.variance": float(model.covar_module.outputscale.detach()),
               ".kernel.lengthscales": model.covar_module.base_kernel.lengthscale.detach().flatten().tolist(),
               ".likelihood.variance": float(model.likelihood.noise.detach())}
+    if kernel_name != "rbf":
+        params[".kernel.type"] = kernel_name
     return params
 
 
-def instance_name(problem, dim, n, seed):
+def instance_name(problem, dim, n, seed, kernel_name="rbf"):
     if problem == "gp_prior":
-        return "gp_prior_seed%d" % seed
-    if problem in ("autoam", "benzylation"):
-        return problem
-    return "%s_%dD_%dN_seed%d" % (problem, dim, n, seed)
+        name = "gp_prior_seed%d" % seed
+    elif problem in ("autoam", "benzylation"):
+        name = problem
+    else:
+        name = "%s_%dD_%dN_seed%d" % (problem, dim, n, seed)
+    return name if kernel_name == "rbf" else name + "_" + kernel_name
 
 
-def make_instance(problem, dim, n, seed, root):
+def make_instance(problem, dim, n, seed, root, kernel_name="rbf"):
     """Generate data, fit the GP and write it in main.py's input format (cached)."""
-    path = os.path.join(root, instance_name(problem, dim, n, seed))
+    path = os.path.join(root, instance_name(problem, dim, n, seed, kernel_name))
     if os.path.exists(os.path.join(path, "meta.json")):
         add_normalization(path) # instances cached before params.json stored the normalization
         return path
@@ -188,7 +198,7 @@ def make_instance(problem, dim, n, seed, root):
     x = (X - bounds[0])/(bounds[1] - bounds[0]) # scale to [0,1]^d
     y_mean, y_std = torch.mean(Y), torch.std(Y)
     y = (Y - y_mean)/y_std # standardize
-    params = fit_gp(x, y, PROBLEMS[problem]["noise"])
+    params = fit_gp(x, y, PROBLEMS[problem]["noise"], kernel_name)
 
     os.makedirs(path, exist_ok=True)
     np.save(os.path.join(path, "X.npy"), x.numpy())
@@ -235,11 +245,12 @@ def scaled_problem(gp):
     """
     The posterior mean in lengthscale-scaled coordinates z = x/l, as plain Python floats for the
     algebraic modeling interfaces of SCIP, MAiNGO and BARON:
-        mu(z) = sum_k alpha[k] * sigma_f^2 * exp(-0.5 * ||z - Z[k]||^2),   z in [0, zU].
+        mu(z) = sum_k alpha[k] * sigma_f^2 * k(||z - Z[k]||),   z in [0, zU],
+    and the kernel name (see benchmarks/kernel_expression.py).
     """
     Z = (gp.x/gp.l).tolist()
     zU = (1/gp.l).flatten().tolist()
-    return Z, zU, gp.alpha.flatten().tolist(), float(gp.sigma_f)
+    return Z, zU, gp.alpha.flatten().tolist(), float(gp.sigma_f), gp.kernel.name
 
 
 def interval_bounds(gp):
@@ -247,8 +258,8 @@ def interval_bounds(gp):
     alpha = gp.alpha.flatten()
     box = torch.stack((torch.zeros(gp.dim, dtype=torch.float64), (1/gp.l).flatten()))
     dist_near, dist_far = distance_bounds(box, gp.x/gp.l)
-    mu_LB = analytic_bound(alpha, gp.sigma_f, dist_near, dist_far)
-    mu_UB = -analytic_bound(-alpha, gp.sigma_f, dist_near, dist_far) # upper bound of sum = -(lower bound of -sum)
+    mu_LB = analytic_bound(alpha, gp.sigma_f, dist_near, dist_far, gp.kernel)
+    mu_UB = -analytic_bound(-alpha, gp.sigma_f, dist_near, dist_far, gp.kernel) # upper bound of sum = -(lower bound of -sum)
     return float(mu_LB), float(mu_UB)
 
 
@@ -256,6 +267,8 @@ def interval_bounds(gp):
 def parse_args(description, palm=False):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--problem", required=True, choices=list(PROBLEMS))
+    parser.add_argument("--kernel", default="rbf", choices=["rbf", "matern12", "matern32", "matern52"],
+                        help="GP kernel fitted to the data (default rbf)")
     parser.add_argument("--dim", type=int, nargs="+", default=[2], help="input dimension(s) (eggholder/schwefel)")
     parser.add_argument("--n", type=int, nargs="+", default=[100], help="number(s) of training points (eggholder/schwefel)")
     parser.add_argument("--seeds", type=int, nargs="+", default=None,
@@ -287,7 +300,7 @@ def iterate_instances(args):
         configs = [(d, n) for d in args.dim for n in args.n]
     for dim, n in configs:
         for seed in seeds:
-            yield make_instance(args.problem, dim, n, seed, args.instances), seed
+            yield make_instance(args.problem, dim, n, seed, args.instances, args.kernel), seed
 
 
 def write_result(args, solver, row):
@@ -297,7 +310,8 @@ def write_result(args, solver, row):
     row = {"solver": solver, "problem": args.problem, "threads": args.threads, "time_limit": args.time_limit, **row}
 
     os.makedirs(args.out, exist_ok=True)
-    file = os.path.join(args.out, "%s_%s.csv" % (solver, args.problem))
+    suffix = "" if args.kernel == "rbf" else "_" + args.kernel # separate files per kernel (same columns)
+    file = os.path.join(args.out, "%s_%s%s.csv" % (solver, args.problem, suffix))
     new = not os.path.exists(file)
     with open(file, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(row))

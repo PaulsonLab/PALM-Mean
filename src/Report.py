@@ -110,8 +110,8 @@ def print_results(BO_obj):
               + "\n%22s  (add x_lower, x_upper to params.json to report x* in original units)" % "")
     print("-" * WIDTH)
     print(" %-20s : d = %d, N = %d training points" % ("Problem", BO_obj.dim, len(BO_obj.x)))
-    print(" %-20s : rho = %g, %d PWL segments, %d Gurobi thread(s)" % (
-        "Settings", BO_obj.hyperparameter, BO_obj.PWL_segment, BO_obj.Thread_gurobi))
+    print(" %-20s : %s kernel, rho = %g, %d PWL segments, %d Gurobi thread(s)" % (
+        "Settings", BO_obj.kernel.name, BO_obj.hyperparameter, BO_obj.PWL_segment, BO_obj.Thread_gurobi))
     n_initial = r["preprocess_boxes"] - r["unexplored_boxes"] # boxes bounded before branching
     if BO_obj.PreProcess:
         initial, initial_time = "%d preprocessing boxes" % n_initial, "preprocessing"

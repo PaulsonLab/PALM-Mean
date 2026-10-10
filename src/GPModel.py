@@ -3,10 +3,12 @@
 """
 Created on Wed Jun  7 09:14:51 2023
 
-Trained GP model. GPModel loads the training data and RBF hyperparameters of an
+Trained GP model. GPModel loads the training data and kernel hyperparameters of an
 already trained GP, computes alpha = (K + noise*I)^-1 y and evaluates the posterior mean
 
-    mu(x) = sum_i alpha_i * sigma_f^2 * exp(-0.5 * ||(x - x_i)/l||^2).
+    mu(x) = sum_i alpha_i * sigma_f^2 * k(||(x - x_i)/l||),
+
+with k the RBF or a Matern kernel (see src/Kernels.py).
 
 Hyperparameters are not fitted here (see benchmarks/common.py for fitting).
 
@@ -15,17 +17,19 @@ Hyperparameters are not fitted here (see benchmarks/common.py for fitting).
 import json
 import numpy as np
 import torch
+from src.Kernels import get_kernel
 
 
-def RBF_Matrix(Z, sigma_f, noise):
+def Kernel_Matrix(Z, sigma_f, noise, kernel):
     """
-    Covariance matrix K + noise*I of the RBF kernel.
+    Covariance matrix K + noise*I.
 
     Z       : training inputs divided by the lengthscales -- tensor (N x dim)
     sigma_f : kernel standard deviation (sqrt of the signal variance)
     noise   : observation-noise variance -- tensor of shape (1,)
+    kernel  : Kernel object (src/Kernels.py)
     """
-    K = (sigma_f ** 2) * torch.exp(-0.5 * torch.cdist(Z, Z, p=2).pow(2))
+    K = (sigma_f ** 2) * kernel.k(torch.cdist(Z, Z, p=2))
 
     I = torch.eye(Z.size(dim=0))
     I.diagonal().fill_(noise.squeeze(0)) # noise variance on the diagonal
@@ -34,10 +38,11 @@ def RBF_Matrix(Z, sigma_f, noise):
 
 class GPModel():
     """
-    Trained GP with an ARD squared-exponential (RBF) kernel and zero prior mean.
+    Trained GP with an ARD stationary kernel (RBF or Matern 1/2, 3/2, 5/2) and zero prior mean.
 
     Inputs:
-        param_path : JSON file with '.kernel.variance', '.kernel.lengthscales', '.likelihood.variance', and
+        param_path : JSON file with '.kernel.variance', '.kernel.lengthscales', '.likelihood.variance',
+                     optionally '.kernel.type' ('rbf' (default), 'matern12', 'matern32', 'matern52'), and
                      optionally the normalization of the data ('x_lower', 'x_upper', 'y_mean', 'y_std'):
                          x_original = x_lower + x*(x_upper - x_lower),   y_original = y_mean + y_std*y
         X_path     : training inputs, .npy array (N x dim), normalized to [0,1]^dim
@@ -50,6 +55,7 @@ class GPModel():
         sigma_f : kernel standard deviation
         jitter  : observation-noise variance
         alpha   : (K + noise*I)^-1 y -- tensor (N x 1)
+        kernel  : Kernel object (src/Kernels.py)
         x_lower, x_upper, y_mean, y_std : normalization (None if not given in param_path)
     """
 
@@ -65,11 +71,12 @@ class GPModel():
         self.l = torch.tensor([params['.kernel.lengthscales']]).to(torch.float64)
         self.sigma_f = torch.tensor(params['.kernel.variance']).to(torch.float64)**0.5
         self.jitter = torch.tensor([params['.likelihood.variance']]).to(torch.float64)
+        self.kernel = get_kernel(params.get('.kernel.type', 'rbf'))
 
         self.x_lower, self.x_upper = params.get('x_lower'), params.get('x_upper')
         self.y_mean, self.y_std = params.get('y_mean'), params.get('y_std')
 
-        self.K =RBF_Matrix(self.x/self.l, self.sigma_f, self.jitter)
+        self.K = Kernel_Matrix(self.x/self.l, self.sigma_f, self.jitter, self.kernel)
         self.K_inv = torch.inverse(self.K)
         self.alpha = torch.matmul(self.K_inv, self.y)
 
@@ -87,4 +94,4 @@ class GPModel():
     def posterior_mean(self, x):
         """Posterior mean at a single point x (numpy array, normalized input space)."""
         distance = np.linalg.norm(self.x/self.l - x/self.l, axis=1)
-        return np.sum(np.array(self.alpha.flatten())*self.sigma_f.numpy()**2*np.exp(-0.5*distance**2))
+        return np.sum(np.array(self.alpha.flatten())*self.sigma_f.numpy()**2*self.kernel.k(distance))

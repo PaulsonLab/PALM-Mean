@@ -33,7 +33,7 @@ def setup_problem(Preprocess, Thread_gurobi, PWL_segment, n_prepart, hyperparame
     dim = GP_obj.dim
 
     # Presolve: local optimization of the posterior mean over the whole box gives the first incumbent
-    candidate, pre_UB = get_UB(GP_obj.sigma_f, GP_obj.alpha, GP_obj.x/l, torch.zeros(dim), torch.ones(dim)/l[0], 5)
+    candidate, pre_UB = get_UB(GP_obj.sigma_f, GP_obj.alpha, GP_obj.x/l, torch.zeros(dim), torch.ones(dim)/l[0], 5, GP_obj.kernel)
     GP_obj.Best_UB = float(pre_UB)
     GP_obj.Best_UB_arg = candidate*l[0]
 

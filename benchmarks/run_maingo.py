@@ -8,12 +8,14 @@ Examples:
     python benchmarks/run_maingo.py --problem schwefel --dim 6 --n 100
 """
 import maingopy as mg
+from kernel_expression import kernel_expression
 from common import parse_args, iterate_instances, load_instance, scaled_problem, write_result, PALM_SETTINGS
 
 
 class GPMeanModel(mg.MAiNGOmodel):
-    def __init__(self, Z, zU, alpha, s_f):
+    def __init__(self, Z, zU, alpha, s_f, kernel_name):
         mg.MAiNGOmodel.__init__(self) # required by MAiNGO
+        self.kernel_name = kernel_name
         self.Z = Z
         self.zU = zU
         self.alpha = alpha
@@ -28,7 +30,7 @@ class GPMeanModel(mg.MAiNGOmodel):
             distance_square = 0
             for j in range(len(self.zU)):
                 distance_square += (z[j] - self.Z[i][j])**2
-            mean += self.alpha[i]*self.s_f**2*mg.exp(-0.5*distance_square)
+            mean += self.alpha[i]*self.s_f**2*kernel_expression(self.kernel_name, distance_square, mg.sqrt, mg.exp)
 
         result = mg.EvaluationContainer()
         result.objective = mean
