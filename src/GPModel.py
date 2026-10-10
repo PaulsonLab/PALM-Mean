@@ -11,8 +11,6 @@ already trained GP, computes alpha = (K + noise*I)^-1 y and evaluates the poster
 with k the RBF or a Matern kernel (see src/Kernels.py).
 
 Hyperparameters are not fitted here (see benchmarks/common.py for fitting).
-
-@author: kudva.7
 """
 import json
 import numpy as np

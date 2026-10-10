@@ -5,8 +5,6 @@ Created on Wed Jul  5 13:38:50 2023
 
 Spatial branch-and-bound driver: optional pre-partitioning of the root box, best-first node
 selection, bisection of the longest edge, and pruning. All boxes are in z-space (z = x/l).
-
-@author: tang.1856
 """
 import math
 import time

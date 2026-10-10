@@ -5,8 +5,6 @@ Created on Thu Feb 20 19:22:30 2025
 
 Closed-form (analytical) bounds of kernel terms over a box, and the importance split.
 Everything is in lengthscale-scaled coordinates z = x/l.
-
-@author: tang.1856
 """
 import torch
 

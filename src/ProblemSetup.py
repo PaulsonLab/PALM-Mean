@@ -5,8 +5,6 @@ Created on Wed Feb 19 21:38:08 2025
 
 Builds the object the B&B solver works on: the trained GP (GPModel) plus a presolve
 incumbent, the search box in lengthscale-scaled coordinates and the solver settings.
-
-@author: tang.1856
 """
 import torch
 from src.GPModel import GPModel

@@ -21,8 +21,6 @@ for r > r_infl (Matern 1/2: convex everywhere). The interval [rL_i, rU_i] is spl
 contains it; on each side the curvature of f_i = alpha_i * k is that of k for alpha_i > 0 and the
 opposite for alpha_i < 0. Both pieces of the envelope pass through (r_infl, f_i(r_infl)), so the PWL
 function is continuous and below f_i on the whole interval.
-
-@author: kudva.7
 """
 import gurobipy as gp
 import torch
