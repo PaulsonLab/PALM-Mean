@@ -76,6 +76,7 @@ The output below is from `python main.py --no-preprocess --seed 0`, which branch
  / ____/ ___ |/ /___/ /  / /_____/ /  / /  __/ /_/ / / / /
 /_/   /_/  |_/_____/_/  /_/     /_/  /_/\___/\__,_/_/ /_/
  Global optimization of Gaussian process posterior means
+ Developed by Wei-Ting (Jonathan) Tang, Akshay Kudva, Calvin Tsay, and Joel Paulson
  d = 3, N = 20 training points | time limit 600 s | 1 Gurobi thread(s)
 
 ===================================================================================================
@@ -381,6 +382,7 @@ The output below omits Gurobi's license message.
  / ____/ ___ |/ /___/ /  / /_____/ /  / /  __/ /_/ / / / /
 /_/   /_/  |_/_____/_/  /_/     /_/  /_/\___/\__,_/_/ /_/
  Global optimization of Gaussian process posterior means
+ Developed by Wei-Ting (Jonathan) Tang, Akshay Kudva, Calvin Tsay, and Joel Paulson
  d = 2, N = 1000 training points | time limit 600 s | 16 Gurobi thread(s)
 
 +---------+--------+-------------+-------------+------------+----------+----------+---------------+

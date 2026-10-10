@@ -22,6 +22,7 @@ def print_banner(BO_obj, time_limit):
     """Logo and a one-line description of the run, printed when the search starts."""
     print(LOGO.rstrip("\n"))
     print(" Global optimization of Gaussian process posterior means")
+    print(" Developed by Wei-Ting (Jonathan) Tang, Akshay Kudva, Calvin Tsay, and Joel Paulson")
     print(" d = %d, N = %d training points | time limit %g s | %d Gurobi thread(s)" % (
         BO_obj.dim, len(BO_obj.x), time_limit, BO_obj.Thread_gurobi), flush=True)
 
