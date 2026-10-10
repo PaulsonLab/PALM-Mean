@@ -15,7 +15,7 @@ import numpy as np
 import torch
 from src.LowerBound import get_LB
 from src.Analytical_LB import get_analytic_all
-from src.Report import ProgressLog
+from src.Report import ProgressLog, print_banner
 
 # Outcomes of BranchOrPrune
 PRUNE_BY_BOUND = 1     # node LB above the incumbent
@@ -79,7 +79,7 @@ def PrePross(BO_obj, time_limit, progress):
         LowerBoundList.append(node.LB)
         if BO_obj.log_every and len(DecisionNodes) % BO_obj.log_every == 0:
             progress.line(len(DecisionNodes), None, min(BO_obj.Best_UB, float(min(UpperBoundList))), None,
-                           time.time() - start_time_pre, "preprocessing %d/%d boxes" % (len(DecisionNodes), len(x_LB)))
+                          time.time() - start_time_pre, n_boxes=len(x_LB))
         if time.time() - start_time_pre > time_limit:
             break
 
@@ -136,6 +136,8 @@ def BranchBound(time_limit, BO_obj):
     Run statistics are also stored in BO_obj.result (see src/Report.py).
     """
     start_time_BB = time.time()
+    if BO_obj.log_every:
+        print_banner(BO_obj, time_limit)
     progress = ProgressLog()
 
     DecisionNodes, UpperBoundList, LowerBoundList, unexplored_LB, n_boxes = PrePross(BO_obj, time_limit, progress)
@@ -190,6 +192,7 @@ def BranchBound(time_limit, BO_obj):
             LowerBoundList = np.delete(LowerBoundList, [k])
             UpperBoundList = np.delete(UpperBoundList, [k])
 
+    progress.close()
     BO_obj.result = {"UB": BO_obj.Best_UB, "LB": BestLowerBound, "x": BO_obj.Best_UB_arg,
                      "nodes": node_count, "preprocess_boxes": n_boxes, "unexplored_boxes": n_boxes - n_bounded,
                      "active_nodes": len(DecisionNodes), "timed_out": timed_out, "time_limit": time_limit,

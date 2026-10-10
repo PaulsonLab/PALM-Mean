@@ -1,35 +1,70 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Human-readable output of a PALM-Mean run: progress lines printed during the search, and the final
-summary built from the statistics BranchBound stores in BO_obj.result.
+Human-readable output of a PALM-Mean run: a banner, a progress table printed during the search,
+and the final summary built from the statistics BranchBound stores in BO_obj.result.
+Plain ASCII only, so the output renders in any terminal encoding.
 """
 import torch
+
+WIDTH = 99 # width of the progress table and of the summary rules
+
+LOGO = r"""
+    ____  ___    __    __  ___      __  ___
+   / __ \/   |  / /   /  |/  /     /  |/  /__  ____ _____
+  / /_/ / /| | / /   / /|_/ /_____/ /|_/ / _ \/ __ `/ __ \
+ / ____/ ___ |/ /___/ /  / /_____/ /  / /  __/ /_/ / / / /
+/_/   /_/  |_/_____/_/  /_/     /_/  /_/\___/\__,_/_/ /_/
+"""
+
+
+def print_banner(BO_obj, time_limit):
+    """Logo and a one-line description of the run, printed when the search starts."""
+    print(LOGO.rstrip("\n"))
+    print(" Global optimization of Gaussian process posterior means")
+    print(" d = %d, N = %d training points | time limit %g s | %d Gurobi thread(s)" % (
+        BO_obj.dim, len(BO_obj.x), time_limit, BO_obj.Thread_gurobi), flush=True)
 
 
 class ProgressLog():
     """
-    Progress lines printed during the search, under a header of column titles. The header is printed
-    with the first line, so it is not separated from the table by Gurobi's license banner, which
-    appears when the first node MIQCP is built.
+    Progress table printed during the search. The header is printed with the first row, so it is not
+    separated from the table by Gurobi's license banner, which appears when the first node MIQCP is
+    built; close() draws the bottom border.
     """
+    # (title, width) of each column
+    COLUMNS = [("Nodes", 7), ("Open", 6), ("Best UB", 11), ("Lower bound", 11), ("Abs gap", 10),
+               ("Rel gap", 8), ("Time (s)", 8), ("Stage", 13)]
 
     def __init__(self):
         self.header_printed = False
+        self.rule = "+" + "+".join("-"*(w + 2) for _, w in self.COLUMNS) + "+"
+        assert len(self.rule) == WIDTH
 
-    def line(self, nodes, open_nodes, UB, LB, elapsed, note=""):
-        """One progress line. open_nodes and LB are None during preprocessing, when the lower bound
-        of the boxes not yet bounded is unknown."""
+    def _row(self, cells):
+        return "| " + " | ".join(("%-*s" if title == "Stage" else "%*s") % (w, c)
+                                 for (title, w), c in zip(self.COLUMNS, cells)) + " |"
+
+    def line(self, nodes, open_nodes, UB, LB, elapsed, n_boxes=None):
+        """
+        One table row. During preprocessing open_nodes and LB are None (the lower bound of the boxes
+        not yet bounded is unknown) and n_boxes is the total number of preprocessing boxes.
+        """
         if not self.header_printed:
-            print("%8s %7s %12s %12s %10s %9s %9s" % ("Nodes", "Open", "Best UB", "Lower bound", "Abs gap", "Rel gap", "Time (s)"), flush=True)
+            print("\n" + self.rule + "\n" + self._row([t for t, _ in self.COLUMNS]) + "\n" + self.rule, flush=True)
             self.header_printed = True
         if LB is None:
-            line = "%8d %7s %12.6f %12s %10s %9s %9.1f   %s" % (nodes, "-", UB, "-", "-", "-", elapsed, note)
+            cells = ["%d/%d" % (nodes, n_boxes), "-", "%.6f" % UB, "-", "-", "-", "%.1f" % elapsed, "preprocessing"]
         else:
             gap = UB - LB
-            rel_gap = "%8.2f%%" % (100*gap/abs(UB)) if UB != 0 else "%9s" % "-"
-            line = "%8d %7d %12.6f %12.6f %10.6f %s %9.1f   %s" % (nodes, open_nodes, UB, LB, gap, rel_gap, elapsed, note)
-        print(line.rstrip(), flush=True)
+            rel_gap = "%.2f%%" % (100*gap/abs(UB)) if UB != 0 else "-"
+            cells = [str(nodes), str(open_nodes), "%.6f" % UB, "%.6f" % LB, "%.6f" % gap, rel_gap, "%.1f" % elapsed, "branching"]
+        print(self._row(cells), flush=True)
+
+    def close(self):
+        """Bottom border of the table (only if a row was printed)."""
+        if self.header_printed:
+            print(self.rule, flush=True)
 
 
 def print_results(BO_obj):
@@ -51,7 +86,8 @@ def print_results(BO_obj):
         status += "\n%22s  (preprocessing stopped early: %d of %d boxes bounded analytically only)" % (
             "", r["unexplored_boxes"], r["preprocess_boxes"])
 
-    line = "=" * 68
+    line = "=" * WIDTH
+    print()
     print(line)
     print(" PALM-Mean result")
     print(line)
@@ -69,7 +105,7 @@ def print_results(BO_obj):
     else:
         print(" %-20s : [%s]" % ("x* (normalized)", ", ".join("%.6f" % v for v in x))
               + "\n%22s  (add x_lower, x_upper to params.json to report x* in original units)" % "")
-    print("-" * 68)
+    print("-" * WIDTH)
     print(" %-20s : d = %d, N = %d training points" % ("Problem", BO_obj.dim, len(BO_obj.x)))
     print(" %-20s : rho = %g, %d PWL segments, %d Gurobi thread(s)" % (
         "Settings", BO_obj.hyperparameter, BO_obj.PWL_segment, BO_obj.Thread_gurobi))

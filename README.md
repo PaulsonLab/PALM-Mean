@@ -62,12 +62,25 @@ To check that the license works, run `python -c "import gurobipy as gp; gp.Model
 python main.py
 ```
 
-This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints a summary. The output below is from `python main.py --no-preprocess` (branching starts from the root box). With the default `True`, the root box is first split into a grid of up to 500 boxes, and the `Nodes bounded` and `Time` lines show those preprocessing boxes instead.
+This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs, 20 training points). It finishes in a few seconds and prints:
+1. a banner;
+2. a progress table, with a row every 100 nodes;
+3. a summary.
+
+The output below is from `python main.py --no-preprocess --seed 0`, which branches from the root box. This run needs only 23 nodes, so no progress rows appear; see the [EggHolder example](#example-eggholder-with-1000-training-points) for a full table. With preprocessing (the default), the root box is first split into a grid of up to 500 boxes, and the `Nodes bounded` and `Time` lines report those preprocessing boxes instead. Gurobi's license message, printed when the first node is solved, is omitted here.
 
 ```
-====================================================================
+    ____  ___    __    __  ___      __  ___
+   / __ \/   |  / /   /  |/  /     /  |/  /__  ____ _____
+  / /_/ / /| | / /   / /|_/ /_____/ /|_/ / _ \/ __ `/ __ \
+ / ____/ ___ |/ /___/ /  / /_____/ /  / /  __/ /_/ / / / /
+/_/   /_/  |_/_____/_/  /_/     /_/  /_/\___/\__,_/_/ /_/
+ Global optimization of Gaussian process posterior means
+ d = 3, N = 20 training points | time limit 600 s | 1 Gurobi thread(s)
+
+===================================================================================================
  PALM-Mean result
-====================================================================
+===================================================================================================
  Status               : Converged: global minimum certified within tolerance
  Minimum value        : -1.660719   (posterior mean at x*, best upper bound)
  Minimum (original)   : n/a (add y_mean, y_std to params.json)
@@ -76,12 +89,12 @@ This minimizes the posterior mean of the example GP in [`data/`](data) (3 inputs
  Relative gap         : 5.85 %     (tolerance 1 %)
  x* (normalized)      : [0.445703, 0.456800, 0.676201]
                         (add x_lower, x_upper to params.json to report x* in original units)
---------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
  Problem              : d = 3, N = 20 training points
  Settings             : rho = 0.01, 6 PWL segments, 1 Gurobi thread(s)
  Nodes bounded        : 23 (root box + 22 from branching)
  Time                 : 1.4 s (root box 0.2 s, B&B 1.2 s)
-====================================================================
+===================================================================================================
 ```
 
 | Line | Meaning |
@@ -149,7 +162,7 @@ python main.py --params my_gp/params.json --X my_gp/X.npy --Y my_gp/Y.npy --abs-
 | `--preprocess` / `--no-preprocess` | on | Pre-partition the root box into sub-boxes with comparable diagonals, capped at 500 boxes. |
 | `--n-prepart` | `10` | Starting number of partitions along the diagonal for preprocessing. Reduced automatically until there are at most 500 boxes. |
 | `--n-multi` | `2` | Number of random L-BFGS-B starts per node for the upper bound. |
-| `--log-every` | `100` | Print a progress line every 100 generated nodes; `0` turns progress output off. |
+| `--log-every` | `100` | Print the banner and a progress-table row every 100 generated nodes; `0` turns both off, so only the summary is printed. |
 | `--seed` | none | Random seed for the local-search starts, for reproducible runs. |
 
 The paper's experiments use $\rho=0.01$, 6 PWL segments, $\varepsilon_{\rm abs}=0.1$ and $\varepsilon_{\rm rel}=0.01$.
@@ -355,23 +368,34 @@ One replicate (seed 0) of the 2-D EggHolder benchmark with $N = 1000$, solved wi
 python benchmarks/run_palm.py --problem eggholder --dim 2 --n 1000 --replicates 1 --threads 16 --report
 ```
 
-During the search, a progress line is printed every 100 generated nodes. Branching adds nodes in pairs after 99 preprocessing boxes, so the lines appear at 101, 201, and so on.
+The output below omits Gurobi's license message.
+
+- **Progress table.** A row is printed every 100 generated nodes. Branching adds nodes in pairs after the 99 preprocessing boxes, so the rows appear at 101, 201, and so on.
+- **Preprocessing rows.** Runs with at least 100 preprocessing boxes, such as `python main.py` on `data/`, also print rows while preprocessing. These show the boxes bounded so far, e.g. `100/343`. Their lower-bound and gap columns show `-`, since the boxes not yet bounded could still contain lower values.
+- **Summary.** It is printed when the search ends.
 
 ```
-   Nodes    Open      Best UB  Lower bound    Abs gap   Rel gap  Time (s)
-     101     100    -4.535390  -135.445192 130.909802  2886.41%      16.5
-     201     150    -4.535390   -10.294490   5.759100   126.98%      26.9
-     301     200    -4.535390    -6.346114   1.810724    39.92%      33.9
-     401     250    -4.535390    -5.238202   0.702811    15.50%      40.5
-     501     300    -4.535390    -4.911225   0.375835     8.29%      46.1
-```
+    ____  ___    __    __  ___      __  ___
+   / __ \/   |  / /   /  |/  /     /  |/  /__  ____ _____
+  / /_/ / /| | / /   / /|_/ /_____/ /|_/ / _ \/ __ `/ __ \
+ / ____/ ___ |/ /___/ /  / /_____/ /  / /  __/ /_/ / / / /
+/_/   /_/  |_/_____/_/  /_/     /_/  /_/\___/\__,_/_/ /_/
+ Global optimization of Gaussian process posterior means
+ d = 2, N = 1000 training points | time limit 600 s | 16 Gurobi thread(s)
 
-During preprocessing, the lower-bound and gap columns show `-`, since the boxes not yet bounded could still contain lower values. When the search ends, the summary is printed:
++---------+--------+-------------+-------------+------------+----------+----------+---------------+
+|   Nodes |   Open |     Best UB | Lower bound |    Abs gap |  Rel gap | Time (s) | Stage         |
++---------+--------+-------------+-------------+------------+----------+----------+---------------+
+|     101 |    100 |   -4.535390 | -135.445192 | 130.909802 | 2886.41% |     19.4 | branching     |
+|     201 |    150 |   -4.535390 |  -10.294490 |   5.759100 |  126.98% |     30.6 | branching     |
+|     301 |    200 |   -4.535390 |   -6.346114 |   1.810724 |   39.92% |     38.3 | branching     |
+|     401 |    250 |   -4.535390 |   -5.238202 |   0.702811 |   15.50% |     45.5 | branching     |
+|     501 |    300 |   -4.535390 |   -4.911225 |   0.375835 |    8.29% |     51.6 | branching     |
++---------+--------+-------------+-------------+------------+----------+----------+---------------+
 
-```
-====================================================================
+===================================================================================================
  PALM-Mean result
-====================================================================
+===================================================================================================
  Status               : Converged: global minimum certified within tolerance
  Minimum value        : -4.535390   (posterior mean at x*, best upper bound)
  Minimum (original)   : -1394.99   (in the units of the original outputs)
@@ -379,12 +403,12 @@ During preprocessing, the lower-bound and gap columns show `-`, since the boxes 
  Absolute gap         : 0.093831   (tolerance 0.1)
  Relative gap         : 2.07 %     (tolerance 1 %)
  x* (original)        : [512, 392.523]
---------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
  Problem              : d = 2, N = 1000 training points
  Settings             : rho = 0.01, 6 PWL segments, 16 Gurobi thread(s)
  Nodes bounded        : 529 (99 preprocessing boxes + 430 from branching)
- Time                 : 47.8 s (preprocessing 16.3 s, B&B 31.4 s)
-====================================================================
+ Time                 : 53.5 s (preprocessing 19.2 s, B&B 34.3 s)
+===================================================================================================
 ```
 
 - **Same optimum as the paper.** The minimum value matches the paper's run of this instance to six decimals (−4.535391; 655 nodes, 42.6 s on 16 cores of a Xeon Gold 6444Y).
