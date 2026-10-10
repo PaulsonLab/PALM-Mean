@@ -5,8 +5,6 @@ Created on Tue Jul 11 21:26:33 2023
 
 Upper bounding: local optimization of the true posterior mean. Any point found is
 feasible, so its value is a valid upper bound on the minimum over the box.
-
-@author: tang.1856
 """
 import torch
 import numpy as np

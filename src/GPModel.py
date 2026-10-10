@@ -9,8 +9,6 @@ already trained GP, computes alpha = (K + noise*I)^-1 y and evaluates the poster
     mu(x) = sum_i alpha_i * sigma_f^2 * exp(-0.5 * ||(x - x_i)/l||^2).
 
 Hyperparameters are not fitted here (see benchmarks/common.py for fitting).
-
-@author: kudva.7
 """
 import json
 import numpy as np

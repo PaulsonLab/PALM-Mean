@@ -5,8 +5,6 @@ Created on Thu Feb 20 19:25:42 2025
 
 Bounding of one B&B node: node lower bound = analytical bound of the unimportant terms
 + PWL MIQCP bound of the important terms; node upper bound from local optimization.
-
-@author: tang.1856
 """
 import torch
 from src.Analytical_LB import get_analytic

@@ -12,8 +12,6 @@ https://www.gurobi.com/documentation/9.5/examples/piecewise_py.html):
 
     alpha_i < 0: the term is concave in d -> chords through equally spaced points
     alpha_i > 0: the term is convex in d  -> on each segment, the maximum of the tangents at its two ends
-
-@author: kudva.7
 """
 import gurobipy as gp
 import torch
