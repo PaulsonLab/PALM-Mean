@@ -16,10 +16,9 @@ PALM-Mean finds the **certified global minimum** of a trained Gaussian process (
 4. [Solver settings](#solver-settings)
 5. [Repository structure](#repository-structure)
 6. [Method](#method)
-7. [How the code works](#how-the-code-works)
-8. [Benchmarks](#benchmarks)
-9. [Limitations](#limitations)
-10. [Citation](#citation)
+7. [Benchmarks](#benchmarks)
+8. [Limitations](#limitations)
+9. [Citation](#citation)
 
 ---
 
@@ -181,7 +180,8 @@ PALM-Mean/
 │   ├── X.npy                   # Example training inputs  (20 x 3, in [0,1]^3)
 │   ├── Y.npy                   # Example training outputs (20 x 1, centered)
 │   └── params.json             # Example RBF hyperparameters
-├── src/
+├── src/                        # See src/README.md for how the code works
+│   ├── README.md               # Code walkthrough and implementation details
 │   ├── GPModel.py              # GPModel: trained GP - loads data, builds K, computes alpha = K^-1 y
 │   ├── ProblemSetup.py         # setup_problem(): GPModel + presolve + scaled box + solver settings
 │   ├── BranchBound1.py         # B&B driver: preprocessing, Node, branching, pruning, main loop
@@ -264,9 +264,7 @@ All are decreasing in $r$, so steps 1–3 above apply unchanged with $k$ in plac
 - **Sign-aware curvature.** On each side, $f_i$ has the curvature of $k$ when $\alpha_i>0$, and the opposite curvature when $\alpha_i<0$. For Matérn 3/2 and 5/2 with $\alpha_i<0$, $f_i$ is convex left of $r^\ast$ and concave right of it.
 - **Envelope per piece.** Where $f_i$ is convex, use the maximum of the two end-point tangents on each segment. Where it is concave, use chords. Both pieces pass through $(r^\ast,f_i(r^\ast))$, so the PWL function is continuous and lies below $f_i$ on the whole interval.
 
-Two cases need special care:
-- **Near-zero-width interval** ($r_i^U-r_i^L<10^{-5}$): Gurobi cannot use it as a PWL domain. Such a term is bounded by the exact constant $\min(f_i(r_i^L),f_i(r_i^U))$.
-- **Tangent intersection outside its segment** (possible only through rounding): the midpoint is used, with the lower of the two tangents there, which keeps the envelope valid.
+Safeguards for numerically degenerate cases are described in [`src/README.md`](src/README.md#implementation-details).
 
 ### Branch-and-bound
 
@@ -278,49 +276,6 @@ Two cases need special care:
   - its own gap $\mathrm{UB}_h-\mathrm{LB}_h$ meets $\varepsilon_{\rm abs}$ or $\varepsilon_{\rm rel}$;
   - $\mathrm{UB}^*-\mathrm{LB}_h$ meets $\varepsilon_{\rm abs}$ or $\varepsilon_{\rm rel}$.
 - **Convergence:** the PWL envelope gap vanishes as node diameters go to zero, so the algorithm returns an $\varepsilon$-global minimizer (see the paper for the proof).
-
-## How the code works
-
-```
-main.py
- └─ setup_problem(...)                     src/ProblemSetup.py
-     ├─ GPModel(param_path, X_path, Y_path)  src/GPModel.py  -> x, y, ℓ, σ_f, α = K⁻¹y
-     ├─ get_UB(..., n_multi=5) on [0,1]^d    presolve: initial incumbent UB*
-     └─ convert to scaled space z = x / ℓ    (all B&B boxes live in z-space)
- └─ BranchBound(time_limit, GP_obj)         src/BranchBound1.py
-     ├─ PrePross: split root into ≤ 500 boxes, evaluate each one as a Node
-     │   (if the time limit is hit, remaining boxes get an analytical-only LB)
-     └─ loop until no active node or time limit:
-         ├─ pick node with min LB; update UB* from node upper bounds
-         ├─ BranchOrPrune: prune (LB > UB*, node converged, or within tolerance of UB*)
-         └─ or SpatialBranching: bisect longest edge -> 2 child Nodes
-     └─ store run statistics in GP_obj.result
- └─ print_results(GP_obj)                   src/Report.py
-
-Node(xL, xU) -> get_LB(bounds)              src/LowerBound.py
- ├─ get_analytic(bounds)                    src/Analytical_LB.py
- │    d_i^L (projection), d_i^U (farthest vertex), β_i, split into
- │    unimportant (Σ analytical bound = Sigma1) / important (index2)
- ├─ get_UB(bounds, n_multi)                 src/UpperBound.py   -> node UB and its argmin
- └─ PWL_LB(important terms)                 src/PWL_Custom_LB.py
-      Gurobi model: x ∈ box, one d_i variable per important term,
-      d_i = ||(x - x_i)/ℓ||² (two quadratic inequalities),
-      setPWLObj(d_i, breakpoints, values):
-        α_i < 0 -> chords through S+1 points on the curve
-        α_i > 0 -> points + tangent intersections (max-of-tangents envelope)
-      returns m.ObjBound = Sigma2
- LB = Sigma1 + Sigma2
-```
-
-Implementation details:
-
-- **Adaptive MIQCP tolerance.** Nodes whose local upper bound is far above the incumbent don't need a tight lower bound.
-  - If $\mathrm{UB}_h-\mathrm{UB}^*>0.51$, Gurobi's `MIPGapAbs` is set to $\mathrm{UB}_h-\mathrm{UB}^*-0.5$.
-  - Otherwise it is set to $0.01$.
-  - The relative gap is set to $10^{-3}$.
-  - Each node MIQCP has a 10 s time limit. If Gurobi hits it, `ObjBound` is still a valid bound.
-- **Preprocessing.** The number of partitions per dimension is proportional to the box side length, so the sub-boxes have similar diagonals. The count is reduced until there are at most 500 boxes.
-- **Coordinates.** All bounding works in lengthscale-scaled coordinates $z=x/\ell$, where the distance is the plain Euclidean norm. Results are mapped back to $x$ before printing.
 
 ## Benchmarks
 
