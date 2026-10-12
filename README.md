@@ -331,41 +331,7 @@ pip install -r benchmarks/requirements.txt
 python benchmarks/run_palm.py --problem eggholder --dim 2 --n 1000 --seeds 0 --threads 16 --report
 ```
 
-### Results reported in the paper
-
-**Setup used in the paper**
-- Comparison: PALM-Mean against SCIP, MAiNGO and BARON, all deterministic global solvers.
-- PALM-Mean was run on 1 core and on 16 cores (multithreaded Gurobi node solves).
-- Settings: $\rho=0.01$, 6 PWL segments per term, $\varepsilon_{\rm abs}=0.1$, $\varepsilon_{\rm rel}=0.01$.
-
-**Synthetic problems**
-
-- **EggHolder (2-D)**, $N\in\{100,500,1000,1500\}$, 10 replicates, 600 s limit.
-  - PALM-Mean solved all instances on a single core.
-  - SCIP was the strongest baseline up to $N=1000$, but its solved fraction dropped sharply at $N=1500$.
-- **Schwefel**, 40 replicates, 600 s limit, in two studies.
-  - *$d=6$ with increasing $N$:* PALM-Mean (16 cores) had the lowest average CPU time and solved nearly all instances up to $N=500$.
-  - *$N=400$ with increasing $d$:* PALM-Mean was the most reliable across the range of dimensions.
-- **Functions drawn from a GP prior**: 100 instances with $d\in\{6,\dots,10\}$ and $N\in\{200,\dots,600\}$.
-  - PALM-Mean (16 cores) beat SCIP in both solved fraction and solving rate.
-  - Single-core PALM-Mean was competitive with SCIP.
-
-**Real-world case studies**
-
-| Case | Method | B&B nodes | CPU time (s) | Final abs. gap |
-|---|---|---:|---:|---:|
-| N-benzylation ($d=4$, $N=78$, limit 600 s) | **PALM-Mean (16 cores)** | 110 | **15.4** | 0.10 |
-| | PALM-Mean (1 core) | 110 | 33.5 | 0.10 |
-| | SCIP | 66,222 | 106.9 | 0.10 |
-| | MAiNGO | 609,292 | 600 (limit) | 3.52 |
-| | BARON | 45,861 | 600 (limit) | 21.81 |
-| AutoAM ($d=4$, $N=100$, limit 3600 s) | **PALM-Mean (16 cores)** | 4,423 | **1,074.1** | 0.10 |
-| | PALM-Mean (1 core) | 3,163 | 3,600 (limit) | 0.19 |
-| | SCIP | 523,427 | 1,734.8 | 0.10 |
-| | MAiNGO | 945,300 | 3,600 (limit) | 6.64 |
-| | BARON | 69,958 | 3,600 (limit) | 23.15 |
-
-PALM-Mean needs 2–3 orders of magnitude fewer B&B nodes than general-purpose solvers, because each node bound is much tighter.
+For the results of the comparison with SCIP, MAiNGO and BARON, see the [paper](https://arxiv.org/abs/2605.00855).
 
 ## Limitations
 

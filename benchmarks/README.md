@@ -1,6 +1,6 @@
 # PALM-Mean benchmarks
 
-This folder reproduces the test problems of the [paper](https://arxiv.org/abs/2605.00855) and compares PALM-Mean with SCIP, MAiNGO and BARON. PALM-Mean is the unmodified solver in [`src/`](../src) with the default settings of [`main.py`](../main.py); see the [main README](../README.md) for installation, the method, and the results reported in the paper.
+This folder reproduces the test problems of the [paper](https://arxiv.org/abs/2605.00855) and compares PALM-Mean with SCIP, MAiNGO and BARON. PALM-Mean is the unmodified solver in [`src/`](../src) with the default settings of [`main.py`](../main.py); see the [main README](../README.md) for installation and the method, and the [paper](https://arxiv.org/abs/2605.00855) for the results.
 
 ## Running the benchmarks
 
